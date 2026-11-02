@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { state, doctorName, etb } from '../store'
+import { state, doctorName, etb, can } from '../store'
 import { ui } from '../ui'
 
 const router = useRouter()
@@ -12,6 +12,10 @@ const initials = computed(() => c.value.name.split(' ').map((w) => w[0]).join(''
 const rxs = computed(() => state.prescriptions.filter((r) => r.clientId === ui.drawerClient))
 const prescribe = () => { const id = ui.drawerClient; ui.drawerClient = null; router.push({ path: '/prescriptions', query: { client: id } }) }
 const chat = () => { ui.drawerClient = null; router.push('/chat') }
+const role = state.user.role
+const editable = can.editHistory(role)
+const FIELDS = [['concern', 'Main concern'], ['skinType', 'Skin type'], ['allergies', 'Allergies'], ['medications', 'Medications'], ['conditions', 'Medical conditions'], ['previous', 'Previous treatments'], ['pregnant', 'Pregnant / breastfeeding']]
+const startHistory = () => (c.value.history = { source: 'Walk-in', concern: '', skinType: 'Normal', allergies: '', medications: '', conditions: '', previous: '', pregnant: 'No', recordedBy: state.user.name, date: new Date().toISOString().slice(0, 10) })
 </script>
 
 <template>
@@ -28,8 +32,20 @@ const chat = () => { ui.drawerClient = null; router.push('/chat') }
         </div>
         <div class="grid g4" style="grid-template-columns: 1fr 1fr; margin: 14px 0">
           <div class="card stat"><div class="n">{{ mine(state.appointments).length }}</div><div class="l">Visits</div></div>
-          <div class="card stat gold"><div class="n" style="font-size: 26px">{{ etb(spent) }}</div><div class="l">Lifetime spend</div></div>
+          <div v-if="can.seeRevenue(role)" class="card stat gold"><div class="n" style="font-size: 26px">{{ etb(spent) }}</div><div class="l">Lifetime spend</div></div>
+          <div v-else class="card stat gold"><div class="n" style="font-size: 26px">{{ c.app ? 'Yes' : 'No' }}</div><div class="l">On the mobile app</div></div>
         </div>
+
+        <h3>Client history <small v-if="c.history" class="note">{{ c.history.source }} · recorded by {{ c.history.recordedBy }} · {{ c.history.date }}</small></h3>
+        <div v-if="c.history" class="card" style="padding: 12px 16px; margin: 8px 0 16px">
+          <div v-for="[k, label] in FIELDS" :key="k" class="row" style="justify-content: space-between; padding: 5px 0; flex-wrap: nowrap">
+            <small class="note" style="flex-shrink: 0">{{ label }}</small>
+            <input v-if="editable" v-model="c.history[k]" style="max-width: 60%; padding: 5px 8px" />
+            <span v-else style="text-align: right" :style="{ color: k === 'allergies' && c.history[k] && !/none/i.test(c.history[k]) ? 'var(--bad)' : '' }">{{ c.history[k] || '—' }}</span>
+          </div>
+        </div>
+        <button v-else-if="editable" class="btn ghost sm" style="margin: 8px 0 16px" @click="startHistory">+ Record history</button>
+        <p v-else class="note" style="margin: 8px 0 16px">Reception hasn’t recorded a history yet.</p>
 
         <h3>Treatment timeline</h3>
         <ul class="timeline">
@@ -39,8 +55,8 @@ const chat = () => { ui.drawerClient = null; router.push('/chat') }
           <li v-if="!mine(state.appointments).length"><small>No visits yet</small></li>
         </ul>
 
-        <h3>Orders & payments</h3>
-        <ul class="timeline">
+        <h3 v-if="can.seeRevenue(role)">Orders & payments</h3>
+        <ul v-if="can.seeRevenue(role)" class="timeline">
           <li v-for="p in mine(state.payments)" :key="'p' + p.id"><b>{{ p.ref }} — {{ etb(p.amount) }}</b><small>{{ p.method }} · {{ p.status }}</small></li>
           <li v-for="o in mine(state.orders)" :key="'o' + o.id"><b>Order #{{ o.id }} — {{ etb(o.total) }}</b><small>{{ o.status }}</small></li>
         </ul>

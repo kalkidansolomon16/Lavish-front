@@ -23,7 +23,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', hotkey))
 <template>
   <div v-if="state.user" class="shell">
     <aside class="side">
-      <div class="brand"><img src="/img/logo-white.png" alt="Lavish Medical Spa" /><small>STAFF PORTAL</small></div>
+      <div class="brand"><img src="/img/logo-white.png" alt="Lavish Medical Spa" /><small>{{ state.user.label.toUpperCase() }} PORTAL</small></div>
       <nav>
         <RouterLink v-for="n in NAV[state.user.role]" :key="n" :to="'/' + n">{{ t(n) }}</RouterLink>
       </nav>

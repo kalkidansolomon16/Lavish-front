@@ -5,7 +5,7 @@ const page = (name) => () => import(`./views/${name}.vue`)
 
 const routes = [
   { path: '/login', component: page('Login'), meta: { public: true } },
-  ...['dashboard', 'appointments', 'payments', 'clients', 'chat', 'products', 'orders', 'prescriptions', 'complaints', 'academy', 'staff'].map((n) => ({
+  ...['dashboard', 'appointments', 'payments', 'clients', 'chat', 'products', 'orders', 'prescriptions', 'complaints', 'academy', 'staff', 'news', 'schedule', 'modules', 'students'].map((n) => ({
     path: `/${n}`,
     name: n,
     component: page(n[0].toUpperCase() + n.slice(1)),

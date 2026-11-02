@@ -14,7 +14,7 @@ const enter = (r) => { login(r); router.push('/dashboard') }
       <div class="hero-copy">
         <span class="eyebrow">LAVISH STAFF PORTAL</span>
         <h2>Ultra Luxury in Science and Beauty.</h2>
-        <p>One place for appointments, payments, products, academy and client care — connected to the Lavish mobile app.</p>
+        <p>Six portals — CEO, General Manager, Reception, E-commerce, Doctors and Academy — connected to the Lavish mobile app.</p>
       </div>
 
       <div class="floaters">
@@ -42,7 +42,7 @@ const enter = (r) => { login(r); router.push('/dashboard') }
 
         <div class="glass f5">
           <span class="dot">🔔</span>
-          <div><b>New complaint received</b><small>CTO has been alerted</small></div>
+          <div><b>New complaint received</b><small>General Manager has been alerted</small></div>
         </div>
       </div>
     </div>
@@ -50,8 +50,8 @@ const enter = (r) => { login(r); router.push('/dashboard') }
     <div class="box">
       <div class="inner">
         <img src="/img/logo-white.png" alt="Lavish Medical Spa" />
-        <p>Staff portal · prototype demo<br />Choose a role to preview its dashboard</p>
-        <div class="roles">
+        <p>Staff portal · prototype demo<br />Choose a portal to preview it</p>
+        <div class="roles" style="grid-template-columns: 1fr 1fr">
           <button v-for="(r, key) in ROLES" :key="key" @click="enter(key)">
             <b>{{ r.label }}</b><span>{{ r.blurb }}</span>
           </button>

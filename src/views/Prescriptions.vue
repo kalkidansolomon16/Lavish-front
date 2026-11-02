@@ -28,7 +28,7 @@ function save() {
   const rx = { clientId: form.value.clientId, doctorId: docId, note: form.value.note, items: form.value.items.filter((i) => i.productId).map((i) => ({ ...i, qty: +i.qty || 1 })) }
   if (!rx.items.length) return
   actions.addPrescription(rx)
-  pushNotif(`${state.user.name} prescribed ${rx.items.length} product(s) for ${clientName(rx.clientId)}`, ['seller', 'admin'], '/prescriptions')
+  pushNotif(`${state.user.name} prescribed ${rx.items.length} product(s) for ${clientName(rx.clientId)}`, ['ecommerce', 'ceo'], '/prescriptions')
   open.value = false
   form.value = blank()
 }

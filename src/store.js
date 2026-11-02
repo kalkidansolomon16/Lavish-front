@@ -2,52 +2,79 @@
 // When the backend exists, replace each action with an axios call to /api/...
 import { reactive } from 'vue'
 
+// The six web portals.
 export const ROLES = {
-  admin: { label: 'Admin', name: 'Selam Bekele', blurb: 'Products, orders, staff & overview' },
-  reception: { label: 'Receptionist', name: 'Hana Tadesse', blurb: 'Approve appointments, manage payments' },
-  doctor: { label: 'Doctor', name: 'Dr. Meron Alemu', blurb: 'Your clients, appointments & chat', doctorId: 1 },
-  cto: { label: 'CTO', name: 'Dawit Haile', blurb: 'Academy students & client complaints' },
-  seller: { label: 'Medicine Seller', name: 'Abel Girma', blurb: 'Product catalogue & order delivery' },
+  ceo: { label: 'CEO', name: 'Selam Bekele', blurb: 'Full access — revenue, products, doctors, staff & news' },
+  gm: { label: 'General Manager', name: 'Dawit Haile', blurb: 'Complaints, inventory & transfers, HR, academy & news' },
+  reception: { label: 'Receptionist', name: 'Hana Tadesse', blurb: 'Appointments, walk-in intake & payments' },
+  ecommerce: { label: 'Lavish E-commerce', name: 'Abel Girma', blurb: 'Products & prices, inventory, deliveries & order payments' },
+  doctor: { label: 'Doctor', name: 'Dr. Meron Alemu', blurb: 'Your patients, their history & prescriptions', doctorId: 1 },
+  teacher: { label: 'Academy Teacher', name: 'Dr. Meron Alemu', blurb: 'Your students, schedule, modules, videos & exercises', doctorId: 1 },
 }
 
 export const NAV = {
-  admin: ['dashboard', 'appointments', 'payments', 'products', 'orders', 'prescriptions', 'complaints', 'academy', 'staff'],
-  reception: ['dashboard', 'appointments', 'payments', 'clients'],
+  ceo: ['dashboard', 'appointments', 'payments', 'clients', 'products', 'orders', 'prescriptions', 'complaints', 'academy', 'staff', 'news'],
+  gm: ['dashboard', 'complaints', 'products', 'staff', 'academy', 'news'],
+  reception: ['dashboard', 'appointments', 'clients', 'payments'],
+  ecommerce: ['dashboard', 'products', 'orders', 'prescriptions'],
   doctor: ['dashboard', 'appointments', 'clients', 'prescriptions', 'chat'],
-  cto: ['dashboard', 'complaints', 'academy'],
-  seller: ['dashboard', 'products', 'prescriptions', 'orders'],
+  teacher: ['dashboard', 'schedule', 'modules', 'students'],
 }
 
+// Who may do what — one place so views stay consistent.
+export const can = {
+  seeRevenue: (r) => ['ceo', 'reception'].includes(r),
+  approveAppointments: (r) => ['ceo', 'reception'].includes(r),
+  editProducts: (r) => ['ceo', 'ecommerce'].includes(r),
+  transferStock: (r) => ['ceo', 'gm'].includes(r),
+  deliverOrders: (r) => ['ceo', 'ecommerce'].includes(r),
+  grantAccess: (r) => ['ceo', 'gm'].includes(r),
+  ban: (r) => r === 'ceo',
+  editHistory: (r) => ['ceo', 'reception'].includes(r),
+}
+
+export const BRANCHES = ['Addis Ababa – Bole', 'Addis Ababa – Kazanchis', 'Hawassa']
 const today = new Date().toISOString().slice(0, 10)
 const day = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10)
+// Splits opening stock across branches (most at Bole) so transfers have something to move.
+const split = (n) => {
+  const b = Math.ceil(n * 0.6), k = Math.floor((n - b) / 2)
+  return { [BRANCHES[0]]: b, [BRANCHES[1]]: k, [BRANCHES[2]]: n - b - k }
+}
+const saved = JSON.parse(localStorage.getItem('lavish_user') || 'null')
 
 export const state = reactive({
-  user: JSON.parse(localStorage.getItem('lavish_user') || 'null'),
+  user: saved && ROLES[saved.role] ? saved : null,
   toast: '',
 
   doctors: [
-    { id: 1, name: 'Dr. Meron Alemu', specialty: 'Dermatology', skills: ['Signature HydraFacial', 'PRP Skin Rejuvenation', 'Morpheus8 & Microneedling', 'Advanced Dermatology Treatments'], branch: 'Addis Ababa – Bole', status: 'Available' },
-    { id: 2, name: 'Dr. Yonas Tesfaye', specialty: 'Aesthetic Medicine', skills: ['Botox & Dermal Fillers', 'HIFU Face & Neck Lift', 'Signature HydraFacial'], branch: 'Addis Ababa – Bole', status: 'Available' },
-    { id: 3, name: 'Dr. Liya Getachew', specialty: 'Hair Transplant', skills: ['Hair Restoration Solutions'], branch: 'Addis Ababa – Kazanchis', status: 'In surgery' },
-    { id: 4, name: 'Dr. Biruk Mengistu', specialty: 'Body Transformation', skills: ['Body Contouring & Skin Tightening'], branch: 'Hawassa', status: 'Off today' },
+    { id: 1, name: 'Dr. Meron Alemu', specialty: 'Dermatology', skills: ['Signature HydraFacial', 'PRP Skin Rejuvenation', 'Morpheus8 & Microneedling', 'Advanced Dermatology Treatments'], branch: 'Addis Ababa – Bole', status: 'Available', access: 'active' },
+    { id: 2, name: 'Dr. Yonas Tesfaye', specialty: 'Aesthetic Medicine', skills: ['Botox & Dermal Fillers', 'HIFU Face & Neck Lift', 'Signature HydraFacial'], branch: 'Addis Ababa – Bole', status: 'Available', access: 'active' },
+    { id: 3, name: 'Dr. Liya Getachew', specialty: 'Hair Transplant', skills: ['Hair Restoration Solutions'], branch: 'Addis Ababa – Kazanchis', status: 'In surgery', access: 'active' },
+    { id: 4, name: 'Dr. Biruk Mengistu', specialty: 'Body Transformation', skills: ['Body Contouring & Skin Tightening'], branch: 'Hawassa', status: 'Off today', access: 'active' },
+    { id: 5, name: 'Dr. Sara Kebede', specialty: 'Laser & Skin Resurfacing', skills: ['Advanced Dermatology Treatments'], branch: 'Addis Ababa – Kazanchis', status: 'Available', access: 'pending' },
   ],
 
   staff: [
-    { id: 1, name: 'Selam Bekele', role: 'admin', position: 'Operations Admin', branch: 'Addis Ababa – Bole', phone: '+251 911 00 11 22', status: 'active' },
+    { id: 1, name: 'Selam Bekele', role: 'ceo', position: 'Chief Executive Officer', branch: 'Addis Ababa – Bole', phone: '+251 911 00 11 22', status: 'active' },
     { id: 2, name: 'Hana Tadesse', role: 'reception', position: 'Front Desk', branch: 'Addis Ababa – Bole', phone: '+251 911 00 33 44', status: 'active' },
     { id: 3, name: 'Tsion Alemayehu', role: 'reception', position: 'Front Desk', branch: 'Addis Ababa – Kazanchis', phone: '+251 911 00 55 66', status: 'active' },
     { id: 4, name: 'Mekdes Tolera', role: 'reception', position: 'Front Desk', branch: 'Hawassa', phone: '+251 462 00 77 88', status: 'suspended' },
-    { id: 5, name: 'Dawit Haile', role: 'cto', position: 'Academy & Client Care Lead', branch: 'Addis Ababa – Bole', phone: '+251 911 00 99 00', status: 'active' },
-    { id: 6, name: 'Abel Girma', role: 'seller', position: 'Pharmacy & Product Sales', branch: 'Addis Ababa – Bole', phone: '+251 911 11 22 33', status: 'active' },
+    { id: 5, name: 'Dawit Haile', role: 'gm', position: 'General Manager', branch: 'Addis Ababa – Bole', phone: '+251 911 00 99 00', status: 'active' },
+    { id: 6, name: 'Abel Girma', role: 'ecommerce', position: 'E-commerce & Inventory', branch: 'Addis Ababa – Bole', phone: '+251 911 11 22 33', status: 'active' },
   ],
 
   clients: [
-    { id: 1, name: 'Tigist Worku', phone: '+251 911 22 33 44', joined: '2026-08-14', treated: true, doctorId: 1, lastTreatment: 'Signature HydraFacial' },
-    { id: 2, name: 'Rahel Assefa', phone: '+251 922 11 55 66', joined: '2026-09-02', treated: true, doctorId: 1, lastTreatment: 'PRP Skin Rejuvenation' },
-    { id: 3, name: 'Mulu Desta', phone: '+251 933 44 77 88', joined: '2026-10-11', treated: false, doctorId: 2, lastTreatment: '—' },
-    { id: 4, name: 'Frehiwot Kebede', phone: '+251 944 90 12 34', joined: '2026-10-20', treated: true, doctorId: 2, lastTreatment: 'Botox & Dermal Fillers' },
-    { id: 5, name: 'Saron Mekonnen', phone: '+251 955 67 89 01', joined: '2026-10-28', treated: false, doctorId: 3, lastTreatment: '—' },
-    { id: 6, name: 'Betty Yilma', phone: '+251 966 23 45 67', joined: '2026-07-30', treated: true, doctorId: 1, lastTreatment: 'Morpheus8 & Microneedling' },
+    { id: 1, name: 'Tigist Worku', phone: '+251 911 22 33 44', joined: '2026-08-14', treated: true, doctorId: 1, lastTreatment: 'Signature HydraFacial', app: true,
+      history: { source: 'Walk-in', concern: 'Dull, dehydrated skin before a wedding', skinType: 'Dry', allergies: 'None known', medications: 'None', conditions: 'None', previous: 'No previous aesthetic treatments', pregnant: 'No', recordedBy: 'Hana Tadesse', date: '2026-08-14' } },
+    { id: 2, name: 'Rahel Assefa', phone: '+251 922 11 55 66', joined: '2026-09-02', treated: true, doctorId: 1, lastTreatment: 'PRP Skin Rejuvenation', app: true },
+    { id: 3, name: 'Mulu Desta', phone: '+251 933 44 77 88', joined: '2026-10-11', treated: false, doctorId: 2, lastTreatment: '—', app: true },
+    { id: 4, name: 'Frehiwot Kebede', phone: '+251 944 90 12 34', joined: '2026-10-20', treated: true, doctorId: 2, lastTreatment: 'Botox & Dermal Fillers', app: true,
+      history: { source: 'Phone call', concern: 'Fine lines around the eyes and forehead', skinType: 'Combination', allergies: 'Lidocaine (mild)', medications: 'None', conditions: 'None', previous: 'Botox 2025 (another clinic)', pregnant: 'No', recordedBy: 'Hana Tadesse', date: '2026-10-20' } },
+    { id: 5, name: 'Saron Mekonnen', phone: '+251 955 67 89 01', joined: '2026-10-28', treated: false, doctorId: 3, lastTreatment: '—', app: true },
+    { id: 6, name: 'Betty Yilma', phone: '+251 966 23 45 67', joined: '2026-07-30', treated: true, doctorId: 1, lastTreatment: 'Morpheus8 & Microneedling', app: true },
+    { id: 7, name: 'Almaz Tesfaye', phone: '+251 977 31 45 90', joined: today, treated: false, doctorId: 1, lastTreatment: '—', app: false,
+      history: { source: 'Walk-in', concern: 'Dark spots on cheeks (melasma)', skinType: 'Oily', allergies: 'Penicillin', medications: 'Oral contraceptives', conditions: 'None', previous: 'Chemical peel 2024', pregnant: 'No', recordedBy: 'Hana Tadesse', date: today } },
   ],
 
   appointments: [
@@ -70,17 +97,17 @@ export const state = reactive({
   ],
 
   products: [
-    { id: 1, name: 'Vitamin C Brightening Serum', category: 'Skincare', price: 2800, stock: 34, sku: 'LV-SER-001', reorder: 10 },
-    { id: 2, name: 'Hyaluronic Hydra Cream', category: 'Skincare', price: 3200, stock: 21, sku: 'LV-CRM-002', reorder: 10 },
-    { id: 3, name: 'SPF 50 Mineral Sunscreen', category: 'Sun care', price: 1900, stock: 5, sku: 'LV-SUN-003', reorder: 10 },
-    { id: 4, name: 'Post-Treatment Recovery Balm', category: 'Aftercare', price: 2400, stock: 18, sku: 'LV-AFT-004', reorder: 10 },
-    { id: 5, name: 'Scalp Revive Hair Tonic', category: 'Hair', price: 2100, stock: 0, sku: 'LV-HAI-005', reorder: 10 },
+    { id: 1, name: 'Vitamin C Brightening Serum', category: 'Skincare', price: 2800, stock: 34, sku: 'LV-SER-001', reorder: 10, branches: split(34) },
+    { id: 2, name: 'Hyaluronic Hydra Cream', category: 'Skincare', price: 3200, stock: 21, sku: 'LV-CRM-002', reorder: 10, branches: split(21) },
+    { id: 3, name: 'SPF 50 Mineral Sunscreen', category: 'Sun care', price: 1900, stock: 5, sku: 'LV-SUN-003', reorder: 10, branches: split(5) },
+    { id: 4, name: 'Post-Treatment Recovery Balm', category: 'Aftercare', price: 2400, stock: 18, sku: 'LV-AFT-004', reorder: 10, branches: split(18) },
+    { id: 5, name: 'Scalp Revive Hair Tonic', category: 'Hair', price: 2100, stock: 0, sku: 'LV-HAI-005', reorder: 10, branches: split(0) },
   ],
 
   orders: [
-    { id: 9001, clientId: 1, items: 'Vitamin C Brightening Serum ×1, SPF 50 ×2', total: 6600, address: 'Bole, Addis Ababa', lines: [{ productId: 1, qty: 1 }, { productId: 3, qty: 2 }], status: 'placed', date: today },
-    { id: 9002, clientId: 4, items: 'Post-Treatment Recovery Balm ×1', total: 2400, address: 'CMC, Addis Ababa', lines: [{ productId: 4, qty: 1 }], status: 'placed', date: today },
-    { id: 9003, clientId: 2, items: 'Hyaluronic Hydra Cream ×2', total: 6400, address: 'Piassa, Addis Ababa', lines: [{ productId: 2, qty: 2 }], status: 'delivered', date: day(-2) },
+    { id: 9001, clientId: 1, items: 'Vitamin C Brightening Serum ×1, SPF 50 ×2', total: 6600, address: 'Bole, Addis Ababa', lines: [{ productId: 1, qty: 1 }, { productId: 3, qty: 2 }], status: 'placed', date: today, payment: 'unpaid', method: 'Pay on delivery' },
+    { id: 9002, clientId: 4, items: 'Post-Treatment Recovery Balm ×1', total: 2400, address: 'CMC, Addis Ababa', lines: [{ productId: 4, qty: 1 }], status: 'placed', date: today, payment: 'paid', method: 'Telebirr' },
+    { id: 9003, clientId: 2, items: 'Hyaluronic Hydra Cream ×2', total: 6400, address: 'Piassa, Addis Ababa', lines: [{ productId: 2, qty: 2 }], status: 'delivered', date: day(-2), payment: 'paid', method: 'Chapa · CBE Birr', notified: true },
   ],
 
   complaints: [
@@ -89,17 +116,55 @@ export const state = reactive({
     { id: 703, clientId: 2, subject: 'Wrong item delivered', message: 'I ordered the cream but got the serum.', priority: 'low', status: 'resolved', date: day(-9), reply: 'Replacement delivered. Apologies!' },
   ],
 
+  // Learning paths: the General Manager defines courses + modules and assigns teacher doctors;
+  // teachers attach videos and exercises to each module.
   courses: [
-    { id: 1, title: 'Medical Aesthetics Foundations', weeks: 8, price: 35000 },
-    { id: 2, title: 'HydraFacial & Skin Analysis', weeks: 4, price: 18000 },
-    { id: 3, title: 'Injectables: Botox & Fillers', weeks: 6, price: 52000 },
+    { id: 1, title: 'Medical Aesthetics Foundations', weeks: 8, price: 35000, level: 'Beginner', teacherIds: [1], modules: [
+      { id: 11, week: 1, title: 'Skin anatomy & types', video: { title: 'Layers of the skin', mins: 18 }, exercise: { title: 'Label the skin layers', due: day(-28) }, published: true },
+      { id: 12, week: 2, title: 'Hygiene & infection control', video: { title: 'Clinic sterilisation walkthrough', mins: 22 }, exercise: { title: 'Hygiene checklist quiz', due: day(-21) }, published: true },
+      { id: 13, week: 3, title: 'Client consultation', video: { title: 'Running a consultation', mins: 25 }, exercise: { title: 'Role-play recording', due: day(-14) }, published: true },
+      { id: 14, week: 4, title: 'Facials & extractions', video: { title: 'Extraction technique', mins: 31 }, exercise: { title: 'Practical log — 3 facials', due: day(-7) }, published: true },
+      { id: 15, week: 5, title: 'Chemical peels', video: { title: 'Peel depth & selection', mins: 27 }, exercise: { title: 'Peel case study', due: day(3) }, published: true },
+      { id: 16, week: 6, title: 'Microdermabrasion', video: null, exercise: null, published: false },
+      { id: 17, week: 7, title: 'Aftercare & product advice', video: null, exercise: null, published: false },
+      { id: 18, week: 8, title: 'Final practical exam', video: null, exercise: null, published: false },
+    ] },
+    { id: 2, title: 'HydraFacial & Skin Analysis', weeks: 4, price: 18000, level: 'Intermediate', teacherIds: [1, 2], modules: [
+      { id: 21, week: 1, title: 'Skin analysis devices', video: { title: 'Using the skin scanner', mins: 15 }, exercise: { title: 'Analyse 2 client scans', due: day(-10) }, published: true },
+      { id: 22, week: 2, title: 'HydraFacial protocol', video: { title: 'Full HydraFacial protocol', mins: 34 }, exercise: { title: 'Protocol quiz', due: day(-3) }, published: true },
+      { id: 23, week: 3, title: 'Boosters & add-ons', video: null, exercise: null, published: false },
+      { id: 24, week: 4, title: 'Practical assessment', video: null, exercise: null, published: false },
+    ] },
+    { id: 3, title: 'Injectables: Botox & Fillers', weeks: 6, price: 52000, level: 'Advanced', teacherIds: [2], modules: [
+      { id: 31, week: 1, title: 'Facial anatomy', video: { title: 'Danger zones of the face', mins: 40 }, exercise: { title: 'Anatomy mapping', due: day(5) }, published: true },
+      { id: 32, week: 2, title: 'Neurotoxins', video: null, exercise: null, published: false },
+      { id: 33, week: 3, title: 'Hyaluronic fillers', video: null, exercise: null, published: false },
+    ] },
+  ],
+
+  sessions: [
+    { id: 1, courseId: 1, teacherId: 1, date: day(1), time: '10:00', title: 'Chemical peels — practical', kind: 'Practical', room: 'Bole training room' },
+    { id: 2, courseId: 2, teacherId: 1, date: day(2), time: '14:00', title: 'HydraFacial protocol — demo', kind: 'Practical', room: 'Bole training room' },
+    { id: 3, courseId: 1, teacherId: 1, date: day(4), time: '14:00', title: 'Microdermabrasion — theory', kind: 'Theory', room: 'Online (Zoom)' },
+    { id: 4, courseId: 3, teacherId: 2, date: day(3), time: '09:00', title: 'Facial anatomy — cadaver lab', kind: 'Practical', room: 'Kazanchis lab' },
   ],
 
   students: [
-    { id: 1, name: 'Eden Fikru', courseId: 1, progress: 62, status: 'active', msg: 'Can I reschedule Friday’s practical?' },
-    { id: 2, name: 'Nahom Tilahun', courseId: 3, progress: 15, status: 'active', msg: '' },
-    { id: 3, name: 'Kidist Amare', courseId: 2, progress: 0, status: 'pending', msg: 'Hello, I would like to enrol in the next intake.' },
-    { id: 4, name: 'Bethel Zewdu', courseId: 1, progress: 0, status: 'pending', msg: '' },
+    { id: 1, name: 'Eden Fikru', phone: '+251 912 45 67 89', courseId: 1, progress: 62, status: 'active', msg: 'Can I reschedule Friday’s practical?', certificate: null,
+      chat: [{ from: 'teacher', text: 'Welcome to Foundations, Eden!', time: 'Sep 1' }, { from: 'student', text: 'Can I reschedule Friday’s practical?', time: 'Yesterday' }] },
+    { id: 2, name: 'Nahom Tilahun', phone: '+251 913 22 10 44', courseId: 3, progress: 15, status: 'active', msg: '', certificate: null, chat: [] },
+    { id: 3, name: 'Kidist Amare', phone: '+251 914 88 21 07', courseId: 2, progress: 0, status: 'pending', msg: 'Hello, I would like to enrol in the next intake.', certificate: null, chat: [] },
+    { id: 4, name: 'Bethel Zewdu', phone: '+251 915 60 33 12', courseId: 1, progress: 0, status: 'pending', msg: '', certificate: null, chat: [] },
+    { id: 5, name: 'Hanna Mulugeta', phone: '+251 916 74 09 55', courseId: 2, progress: 100, status: 'completed', msg: 'Thank you for everything!', certificate: null,
+      chat: [{ from: 'student', text: 'I passed the practical assessment 🎉', time: 'Mon' }, { from: 'teacher', text: 'Congratulations Hanna — well deserved!', time: 'Mon' }] },
+    { id: 6, name: 'Selamawit Girma', phone: '+251 917 12 98 30', courseId: 2, progress: 48, status: 'active', msg: '', certificate: null, chat: [] },
+  ],
+
+  // Shown on the client Home screen in the mobile app. Posted by the CEO or General Manager.
+  news: [
+    { id: 1, title: 'New: Morpheus8 now at Kazanchis', body: 'Our most requested skin-tightening treatment is now available at the Kazanchis branch. Book from the app.', tag: 'New treatment', date: day(-1), by: 'Selam Bekele', published: true },
+    { id: 2, title: '20% off aftercare this week', body: 'All Aftercare products are 20% off in the Lavish shop until Sunday.', tag: 'Offer', date: day(-3), by: 'Dawit Haile', published: true },
+    { id: 3, title: 'Academy: December intake open', body: 'Applications for the December Foundations intake are now open in the app.', tag: 'Academy', date: day(-6), by: 'Dawit Haile', published: false },
   ],
 
   movements: [
@@ -146,7 +211,7 @@ export function suggestDoctors(appt) {
   const isToday = appt.date === today
   const active = (a) => a.doctorId && !['declined', 'completed'].includes(a.status)
 
-  const ranked = state.doctors.map((d) => {
+  const ranked = state.doctors.filter((d) => d.access === 'active').map((d) => {
     const reasons = []
     let score = 0
     let available = true
@@ -196,6 +261,13 @@ export const reserved = (productId) =>
 function logMove(p, type, qty, reason, ref) {
   state.movements.unshift({ id: Date.now() + Math.random(), productId: p.id, type, qty, balance: p.stock, reason, ref, by: state.user?.name ?? 'System', date: today })
 }
+// Removes qty from branch stock, main branch first. p.stock is always the sum of p.branches.
+function takeFromBranches(p, qty) {
+  for (const b of BRANCHES) {
+    const n = Math.min(p.branches[b], qty)
+    p.branches[b] -= n; qty -= n
+  }
+}
 
 export const actions = {
   assignDoctor(a, d) {
@@ -213,16 +285,26 @@ export const actions = {
   },
   markPaid(p, method) { p.status = 'paid'; if (method) p.method = method; notify('Payment recorded') },
   addProduct(p) {
-    const prod = { id: Date.now(), sku: 'LV-' + String(state.products.length + 1).padStart(3, '0'), reorder: 10, ...p }
+    const prod = { id: Date.now(), sku: 'LV-' + String(state.products.length + 1).padStart(3, '0'), reorder: 10, ...p, branches: { ...split(0), [BRANCHES[0]]: p.stock } }
     state.products.unshift(prod)
     if (prod.stock > 0) logMove(prod, 'in', prod.stock, 'Stock received', 'Opening stock')
     notify('Product added — visible in mobile app')
   },
-  receiveStock(p, qty, ref) { p.stock += qty; logMove(p, 'in', qty, 'Stock received', ref || '—'); notify(`${qty} × ${p.name} added to inventory`) },
+  receiveStock(p, qty, ref, branch = BRANCHES[0]) { p.stock += qty; p.branches[branch] += qty; logMove(p, 'in', qty, 'Stock received · ' + branch, ref || '—'); notify(`${qty} × ${p.name} added to ${branch}`) },
+  transferStock(p, from, to, qty) {
+    if (qty <= 0 || from === to) return
+    if (p.branches[from] < qty) return notify(`Only ${p.branches[from]} at ${from}`)
+    p.branches[from] -= qty; p.branches[to] += qty
+    logMove(p, 'transfer', 0, `${qty} moved ${from} → ${to}`, 'Transfer')
+    notify(`${qty} × ${p.name} transferred to ${to}`)
+  },
+  setPrice(p, price) { p.price = price; notify(`${p.name} now ${etb(price)} in the app`) },
   adjustStock(p, counted, reason) {
     const diff = counted - p.stock
     if (!diff) return notify('No change in quantity')
     p.stock = counted
+    if (diff > 0) p.branches[BRANCHES[0]] += diff
+    else takeFromBranches(p, -diff)
     logMove(p, 'adjust', diff, reason, 'Stock count')
     notify(`${p.name} adjusted to ${counted}`)
   },
@@ -233,9 +315,10 @@ export const actions = {
     const short = lines.find((l) => l.p.stock < l.qty)
     if (short) { notify(`Not enough stock for ${short.p.name} — restock first`); return null }
     const low = []
-    lines.forEach((l) => { l.p.stock -= l.qty; logMove(l.p, 'sold', -l.qty, 'Order delivered', '#' + o.id); if (l.p.stock <= l.p.reorder) low.push(l.p) })
-    o.status = 'delivered'
-    notify(`Order #${o.id} delivered — stock updated`)
+    lines.forEach((l) => { l.p.stock -= l.qty; takeFromBranches(l.p, l.qty); logMove(l.p, 'sold', -l.qty, 'Order delivered', '#' + o.id); if (l.p.stock <= l.p.reorder) low.push(l.p) })
+    o.status = 'delivered'; o.notified = true
+    if (o.method === 'Pay on delivery') o.payment = 'paid'
+    notify(`Order #${o.id} delivered — client notified in the app`)
     return low
   },
   updateComplaint(c, status) { c.status = status; notify(`Complaint ${status}`) },
@@ -255,7 +338,7 @@ export const actions = {
   },
   addStaff(m) {
     if (m.role === 'doctor') {
-      state.doctors.push({ id: Date.now(), name: m.name, specialty: m.position, branch: m.branch, status: 'Available' })
+      state.doctors.push({ id: Date.now(), name: m.name, specialty: m.position, skills: [], branch: m.branch, status: 'Available', access: 'active' })
     } else {
       state.staff.push({ id: Date.now(), ...m, status: 'active' })
     }
@@ -264,5 +347,55 @@ export const actions = {
   toggleStaff(m) { m.status = m.status === 'active' ? 'suspended' : 'active'; notify(`${m.name} ${m.status === 'active' ? 'reactivated' : 'suspended'}`) },
   sendChat(clientId, text) {
     state.chats[clientId].push({ from: 'doctor', text, time: 'now' })
+  },
+
+  // ---- access control (CEO grants + bans, GM grants) ----
+  setDoctorAccess(d, access) {
+    d.access = access
+    notify({ active: `${d.name} can now log in`, banned: `${d.name} is banned — hidden from the mobile app` }[access])
+  },
+
+  // ---- e-commerce ----
+  markOrderPaid(o) { o.payment = 'paid'; notify(`Order #${o.id} marked as paid`) },
+
+  // ---- reception: walk-in / phone booking ----
+  // Creates (or updates) the client with their intake history and books an approved slot.
+  walkIn({ clientId, client, history, appt, sms, invite }) {
+    let c = state.clients.find((x) => x.id === clientId)
+    if (!c) {
+      c = { id: Date.now(), ...client, joined: today, treated: false, doctorId: appt.doctorId, lastTreatment: '—', app: false }
+      state.clients.unshift(c)
+    }
+    c.history = { ...history, recordedBy: state.user.name, date: today }
+    const a = { id: Date.now() + 1, clientId: c.id, ...appt, status: 'approved', notified: true }
+    state.appointments.unshift(a)
+    state.payments.unshift({ id: Date.now() + 2, clientId: c.id, ref: appt.service, amount: appt.price, method: '—', status: 'unpaid', date: appt.date })
+    if (invite) c.invited = true
+    notify(`Booked & ${doctorName(a.doctorId)} notified${sms ? ` — SMS sent to ${c.phone}` : ''}`)
+    return { c, a }
+  },
+  sendAppInvite(c) { c.invited = true; notify(`App download link sent to ${c.phone}`) },
+  markRegistered(c) { c.app = true; notify(`${c.name} is now registered in the app`) },
+
+  // ---- news (CEO + GM) ----
+  addNews(n) { state.news.unshift({ id: Date.now(), date: today, by: state.user.name, ...n }); notify(n.published ? 'Published to the mobile app' : 'Saved as draft') },
+  toggleNews(n) { n.published = !n.published; notify(n.published ? 'Now showing in the mobile app' : 'Hidden from the mobile app') },
+  deleteNews(n) { state.news = state.news.filter((x) => x !== n); notify('News removed') },
+
+  // ---- academy ----
+  addModule(c, title) {
+    const week = c.modules.length + 1
+    c.modules.push({ id: Date.now(), week, title, video: null, exercise: null, published: false })
+    notify(`Module added to ${c.title}`)
+  },
+  setTeachers(c, ids) { c.teacherIds = ids; notify('Teacher access updated') },
+  saveLesson(m, video, exercise) { m.video = video; m.exercise = exercise; notify('Lesson content saved') },
+  publishModule(m) { m.published = !m.published; notify(m.published ? 'Module visible to students' : 'Module hidden') },
+  addSession(s) { state.sessions.push({ id: Date.now(), ...s }); notify('Session added — students notified') },
+  setProgress(st, n) { st.progress = n; if (n >= 100) st.status = 'completed' },
+  messageStudent(st, text) { st.chat.push({ from: 'teacher', text, time: 'now' }) },
+  issueCertificate(st) {
+    st.certificate = { no: 'LA-' + new Date().getFullYear() + '-' + String(st.id).padStart(4, '0'), date: today, by: state.user.name }
+    notify(`Certificate issued — PDF sent to ${st.name}’s app`)
   },
 }

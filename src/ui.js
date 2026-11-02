@@ -24,15 +24,18 @@ export const ui = reactive({
     { label: 'Hawassa', value: 41 },
   ],
   notifications: [
-    { id: 1, text: 'Frehiwot Kebede submitted a complaint about redness after filler', roles: ['cto', 'admin'], time: '2h ago', read: false, to: '/complaints' },
-    { id: 2, text: 'New order #9002 placed from the mobile app', roles: ['admin', 'seller'], time: '3h ago', read: false, to: '/orders' },
-    { id: 3, text: 'Mulu Desta requested HIFU Face & Neck Lift', roles: ['reception', 'admin'], time: '5h ago', read: true, to: '/appointments' },
+    { id: 1, text: 'Frehiwot Kebede submitted a complaint about redness after filler', roles: ['gm', 'ceo'], time: '2h ago', read: false, to: '/complaints' },
+    { id: 2, text: 'New order #9002 placed from the mobile app', roles: ['ceo', 'ecommerce'], time: '3h ago', read: false, to: '/orders' },
+    { id: 4, text: 'Eden Fikru asked to reschedule Friday’s practical', roles: ['teacher'], time: '1h ago', read: false, to: '/students' },
+    { id: 5, text: 'Hanna Mulugeta completed HydraFacial & Skin Analysis — certificate ready to issue', roles: ['gm', 'ceo'], time: '4h ago', read: false, to: '/academy' },
+    { id: 6, text: 'Dr. Sara Kebede is waiting for portal access', roles: ['gm', 'ceo'], time: '6h ago', read: true, to: '/staff' },
+    { id: 3, text: 'Mulu Desta requested HIFU Face & Neck Lift', roles: ['reception', 'ceo'], time: '5h ago', read: true, to: '/appointments' },
   ],
 })
 
 const T = {
   dashboard: 'ዳሽቦርድ', appointments: 'ቀጠሮዎች', payments: 'ክፍያዎች', clients: 'ደንበኞች', chat: 'ውይይት',
-  products: 'ምርቶች', orders: 'ትዕዛዞች', complaints: 'ቅሬታዎች', prescriptions: 'ማዘዣዎች', academy: 'አካዳሚ', staff: 'ሐኪሞች',
+  products: 'ምርቶች', orders: 'ትዕዛዞች', complaints: 'ቅሬታዎች', prescriptions: 'ማዘዣዎች', academy: 'አካዳሚ', staff: 'ሰራተኞች', news: 'ዜና', schedule: 'መርሃ ግብር', modules: 'ሞጁሎች', students: 'ተማሪዎች',
   welcome: 'እንኳን ደህና መጡ', upcoming: 'መጪ ቀጠሮዎች', revenue: 'የሳምንቱ ገቢ', mix: 'የሕክምና ዓይነቶች',
 }
 export const t = (k) => (ui.lang === 'am' && T[k]) || k
@@ -61,19 +64,19 @@ export function startLive() {
   const events = [
     [14000, () => {
       state.appointments.unshift({ id: Date.now(), clientId: 5, doctorId: 2, service: 'Signature HydraFacial', date: day(2), time: '12:00', status: 'pending', notified: false })
-      return ['Saron Mekonnen booked Signature HydraFacial with Dr. Yonas', ['reception', 'admin'], '/appointments']
+      return ['Saron Mekonnen booked Signature HydraFacial with Dr. Yonas', ['reception', 'ceo'], '/appointments']
     }],
     [32000, () => {
       state.orders.unshift({ id: 9004, clientId: 6, items: 'SPF 50 Mineral Sunscreen ×1', total: 1900, address: 'Kazanchis, Addis Ababa', lines: [{ productId: 3, qty: 1 }], status: 'placed', date: day(0) })
-      return ['New order #9004 from Betty Yilma', ['admin', 'seller'], '/orders']
+      return ['New order #9004 from Betty Yilma', ['ceo', 'ecommerce'], '/orders']
     }],
     [50000, () => {
       state.complaints.unshift({ id: Date.now(), clientId: 1, subject: 'Booking not confirmed', message: 'I booked yesterday but did not get a confirmation.', priority: 'medium', status: 'open', date: day(0), reply: '' })
-      return ['Tigist Worku filed a complaint: Booking not confirmed', ['cto', 'admin'], '/complaints']
+      return ['Tigist Worku filed a complaint: Booking not confirmed', ['gm', 'ceo'], '/complaints']
     }],
     [68000, () => {
-      state.students.push({ id: Date.now(), name: 'Meklit Bogale', courseId: 2, progress: 0, status: 'pending', msg: 'I would love to join the HydraFacial course.' })
-      return ['Meklit Bogale applied to the Academy', ['cto'], '/academy']
+      state.students.push({ id: Date.now(), name: 'Meklit Bogale', phone: '+251 918 40 22 61', courseId: 2, progress: 0, status: 'pending', msg: 'I would love to join the HydraFacial course.', certificate: null, chat: [] })
+      return ['Meklit Bogale applied to the Academy', ['gm', 'ceo'], '/academy']
     }],
   ]
   events.forEach(([ms, run]) =>

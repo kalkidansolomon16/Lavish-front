@@ -8,22 +8,22 @@ const short = (o) => o.status === 'placed' && (o.lines ?? []).filter((l) => prod
 
 function deliver(o) {
   const low = actions.confirmDelivery(o)
-  low?.forEach((p) => pushNotif(`Low stock: ${p.name} — ${p.stock} left`, ['admin', 'seller'], '/products'))
+  low?.forEach((p) => pushNotif(`Low stock: ${p.name} — ${p.stock} left`, ['ecommerce', 'gm', 'ceo'], '/products'))
 }
-const exportAll = () => exportCsv('lavish-orders', state.orders.map((o) => ({ Order: o.id, Client: clientName(o.clientId), Items: o.items, Total_ETB: o.total, Address: o.address, Status: o.status })))
+const exportAll = () => exportCsv('lavish-orders', state.orders.map((o) => ({ Order: o.id, Client: clientName(o.clientId), Items: o.items, Total_ETB: o.total, Payment: o.payment, Address: o.address, Status: o.status })))
 </script>
 
 <template>
   <div class="head">
     <div>
       <h1>Product orders</h1>
-      <p>Orders placed by clients in the mobile app. Confirming delivery deducts the items from inventory.</p>
+      <p>Orders placed by clients in the mobile app. Confirming delivery deducts stock and notifies the client in the app.</p>
     </div>
     <button class="btn ghost" @click="exportAll">⬇ Export CSV</button>
   </div>
   <div class="card">
     <table>
-      <thead><tr><th>Order</th><th>Client</th><th>Items</th><th>Total</th><th>Deliver to</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Order</th><th>Client</th><th>Items</th><th>Total</th><th>Payment</th><th>Deliver to</th><th>Status</th><th></th></tr></thead>
       <tbody>
         <tr v-for="o in state.orders" :key="o.id">
           <td>#{{ o.id }}<small>{{ o.date }}</small></td>
@@ -35,8 +35,13 @@ const exportAll = () => exportCsv('lavish-orders', state.orders.map((o) => ({ Or
             <small v-else>Stock deducted ✓</small>
           </td>
           <td>{{ etb(o.total) }}</td>
+          <td>
+            <span class="badge" :class="o.payment === 'paid' ? 'paid' : 'unpaid'">{{ o.payment === 'paid' ? 'paid' : 'not paid' }}</span>
+            <small>{{ o.method || '—' }}</small>
+            <button v-if="o.payment !== 'paid'" class="btn ghost sm" style="margin-top: 4px" @click="actions.markOrderPaid(o)">Mark paid</button>
+          </td>
           <td>{{ o.address }}</td>
-          <td><span class="badge" :class="o.status">{{ o.status }}</span></td>
+          <td><span class="badge" :class="o.status">{{ o.status }}</span><small v-if="o.notified">Client notified ✓</small></td>
           <td><button v-if="o.status === 'placed'" class="btn gold sm" @click="deliver(o)">Confirm delivery</button></td>
         </tr>
       </tbody>

@@ -1,11 +1,13 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { state, actions, clientName, doctorName, suggestDoctors } from '../store'
+import { state, actions, clientName, doctorName, suggestDoctors, can } from '../store'
 import { ui, pushNotif } from '../ui'
 import ClientLink from '../components/ClientLink.vue'
+import WalkIn from '../components/WalkIn.vue'
 
 const role = state.user.role
-const canApprove = ['reception', 'admin'].includes(role)
+const canApprove = can.approveAppointments(role)
+const walkIn = ref(false)
 const tab = ref('all')
 const view = ref('calendar')
 const docFilter = ref(role === 'doctor' ? state.user.doctorId : 0)
@@ -44,10 +46,11 @@ function assign(d) {
   <div class="head">
     <div>
       <h1>Appointments</h1>
-      <p v-if="canApprove">Requests booked by clients in the mobile app. Approving notifies the doctor instantly.</p>
+      <p v-if="canApprove">Requests from the mobile app plus walk-in and phone bookings. Approving notifies the doctor instantly.</p>
       <p v-else>Sessions assigned to you by reception.</p>
     </div>
     <div class="row">
+      <button v-if="canApprove" class="btn gold" @click="walkIn = true">+ Walk-in / phone booking</button>
       <select v-if="role !== 'doctor'" v-model.number="docFilter" style="width: 200px">
         <option :value="0">All doctors</option>
         <option v-for="d in state.doctors" :key="d.id" :value="d.id">{{ d.name }}</option>
@@ -123,6 +126,8 @@ function assign(d) {
       </table>
     </div>
   </template>
+
+  <WalkIn v-if="walkIn" @close="walkIn = false" />
 
   <div v-if="assigning" class="modal-bg" @click.self="assigning = null">
     <div class="modal" style="width: min(680px, 95vw); max-height: 92vh; overflow: auto">

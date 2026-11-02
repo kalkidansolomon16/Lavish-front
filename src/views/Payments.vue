@@ -42,7 +42,7 @@ function sendLink() {
   setTimeout(() => {
     if (p.status !== 'awaiting') return
     complete(p, CHAPA_METHODS[Math.floor(Math.random() * 3)], true)
-    pushNotif(`Chapa webhook: ${clientName(p.clientId)} paid ${etb(p.amount)}`, ['reception', 'admin'], '/payments')
+    pushNotif(`Chapa webhook: ${clientName(p.clientId)} paid ${etb(p.amount)}`, ['reception', 'ceo'], '/payments')
   }, 8000)
 }
 

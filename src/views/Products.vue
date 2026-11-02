@@ -1,9 +1,14 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { state, actions, etb, reserved } from '../store'
+import { state, actions, etb, reserved, can, BRANCHES } from '../store'
 import { exportCsv } from '../ui'
 
-const modal = ref(null) // 'new' | 'restock' | 'adjust' | 'history'
+const role = state.user.role
+const edit = can.editProducts(role)
+const short = (b) => b.replace('Addis Ababa – ', '')
+const modal = ref(null) // 'new' | 'restock' | 'adjust' | 'history' | 'transfer'
+const tf = ref({ from: BRANCHES[0], to: BRANCHES[1], qty: 1 })
+const branch = ref(BRANCHES[0])
 const target = ref(null)
 const search = ref('')
 const blank = () => ({ name: '', category: 'Skincare', price: 0, stock: 0 })
@@ -27,6 +32,7 @@ const totalSold = computed(() => -history.value.filter((m) => m.type === 'sold')
 const open = (kind, p = null) => {
   modal.value = kind; target.value = p
   qty.value = 1; ref_.value = ''; reason.value = 'Count correction'; counted.value = p?.stock ?? 0
+  tf.value = { from: BRANCHES[0], to: BRANCHES[1], qty: 1 }; branch.value = BRANCHES[0]
 }
 const close = () => (modal.value = null)
 
@@ -35,11 +41,12 @@ function saveNew() {
   actions.addProduct({ ...form.value, price: +form.value.price, stock: +form.value.stock })
   form.value = blank(); close()
 }
-function saveRestock() { if (qty.value > 0) { actions.receiveStock(target.value, +qty.value, ref_.value); close() } }
+function saveRestock() { if (qty.value > 0) { actions.receiveStock(target.value, +qty.value, ref_.value, branch.value); close() } }
+function saveTransfer() { actions.transferStock(target.value, tf.value.from, tf.value.to, +tf.value.qty); close() }
 function saveAdjust() { actions.adjustStock(target.value, Math.max(0, +counted.value), reason.value); close() }
 
-const typeLabel = { in: 'Received', sold: 'Sold', adjust: 'Adjusted' }
-const typeClass = { in: 'paid', sold: 'awaiting', adjust: 'pending' }
+const typeLabel = { in: 'Received', sold: 'Sold', adjust: 'Adjusted', transfer: 'Transfer' }
+const typeClass = { in: 'paid', sold: 'awaiting', adjust: 'pending', transfer: '' }
 const exportAll = () =>
   exportCsv('lavish-inventory', state.products.map((p) => ({ SKU: p.sku, Product: p.name, Category: p.category, Price_ETB: p.price, On_hand: p.stock, Reserved: reserved(p.id), Available: avail(p), Reorder_level: p.reorder })))
 </script>
@@ -48,17 +55,19 @@ const exportAll = () =>
   <div class="head">
     <div>
       <h1>Products & inventory</h1>
-      <p>Stock goes up when you receive products and down when an order is delivered. Every change is logged.</p>
+      <p v-if="edit">Post products with prices for the mobile app. Stock goes up when you receive products and down when an order is delivered.</p>
+      <p v-else>Track stock in every branch and transfer products between branches. Every change is logged.</p>
     </div>
     <div class="row">
       <button class="btn ghost" @click="exportAll">⬇ Export</button>
-      <button class="btn gold" @click="open('new')">+ Add product</button>
+      <button v-if="edit" class="btn gold" @click="open('new')">+ Add product</button>
     </div>
   </div>
 
   <div class="grid g4" style="margin-bottom: 20px">
     <div class="card stat gold"><div class="n">{{ units }}</div><div class="l">Units on hand</div></div>
-    <div class="card stat"><div class="n">{{ etb(value) }}</div><div class="l">Stock value (retail)</div></div>
+    <div v-if="can.seeRevenue(role) || edit" class="card stat"><div class="n">{{ etb(value) }}</div><div class="l">Stock value (retail)</div></div>
+    <div v-else class="card stat"><div class="n">{{ state.products.length }}</div><div class="l">Products listed</div></div>
     <div class="card stat"><div class="n">{{ reservedTotal }}</div><div class="l">Reserved for open orders</div></div>
     <div class="card stat"><div class="n" :style="{ color: lowCount ? 'var(--bad)' : '' }">{{ lowCount }}</div><div class="l">Need reorder</div></div>
   </div>
@@ -66,11 +75,15 @@ const exportAll = () =>
   <div class="card">
     <input v-model="search" placeholder="Search by product name or SKU…" style="max-width: 320px; margin-bottom: 12px" />
     <table>
-      <thead><tr><th>Product</th><th>Price</th><th>On hand</th><th>Reserved</th><th>Available</th><th>Level</th><th></th></tr></thead>
+      <thead><tr><th>Product</th><th>Price</th><th v-for="b in BRANCHES" :key="b">{{ short(b) }}</th><th>On hand</th><th>Reserved</th><th>Available</th><th>Level</th><th></th></tr></thead>
       <tbody>
         <tr v-for="p in rows" :key="p.id">
           <td>{{ p.name }}<small>{{ p.sku }} · {{ p.category }}</small></td>
-          <td>{{ etb(p.price) }}</td>
+          <td>
+            <input v-if="edit" :value="p.price" type="number" min="0" style="width: 100px; padding: 5px 8px" @change="actions.setPrice(p, +$event.target.value)" />
+            <template v-else>{{ etb(p.price) }}</template>
+          </td>
+          <td v-for="b in BRANCHES" :key="b">{{ p.branches[b] }}</td>
           <td><b>{{ p.stock }}</b></td>
           <td>{{ reserved(p.id) || '—' }}</td>
           <td :style="{ color: avail(p) < 0 ? 'var(--bad)' : '' }">{{ avail(p) }}</td>
@@ -80,12 +93,13 @@ const exportAll = () =>
             </span>
           </td>
           <td class="row">
-            <button class="btn gold sm" @click="open('restock', p)">+ Receive</button>
-            <button class="btn ghost sm" @click="open('adjust', p)">Adjust</button>
+            <button v-if="edit" class="btn gold sm" @click="open('restock', p)">+ Receive</button>
+            <button v-if="edit" class="btn ghost sm" @click="open('adjust', p)">Adjust</button>
+            <button v-if="can.transferStock(role)" class="btn gold sm" @click="open('transfer', p)">⇄ Transfer</button>
             <button class="btn ghost sm" @click="open('history', p)">History</button>
           </td>
         </tr>
-        <tr v-if="!rows.length"><td colspan="7" class="empty">No products found</td></tr>
+        <tr v-if="!rows.length"><td colspan="10" class="empty">No products found</td></tr>
       </tbody>
     </table>
   </div>
@@ -108,11 +122,25 @@ const exportAll = () =>
       <h2>Receive stock</h2>
       <p class="note">{{ target.name }} · now {{ target.stock }} on hand</p>
       <label>Quantity received</label><input v-model.number="qty" type="number" min="1" required />
+      <label>Receive at branch</label>
+      <select v-model="branch"><option v-for="b in BRANCHES" :key="b">{{ b }}</option></select>
       <label>Supplier / invoice reference</label><input v-model="ref_" placeholder="e.g. INV-2041 · Addis Pharma" />
       <p class="serif" style="font-size: 22px; margin-top: 14px">New balance: {{ target.stock + (+qty || 0) }}</p>
       <div class="row" style="margin-top: 14px; justify-content: flex-end">
         <button type="button" class="btn ghost" @click="close">Cancel</button>
         <button class="btn gold">Add to inventory</button>
+      </div>
+    </form>
+
+    <form v-else-if="modal === 'transfer'" class="modal" @submit.prevent="saveTransfer">
+      <h2>Transfer stock</h2>
+      <p class="note">{{ target.name }} · {{ BRANCHES.map((b) => short(b) + ' ' + target.branches[b]).join(' · ') }}</p>
+      <label>From</label><select v-model="tf.from"><option v-for="b in BRANCHES" :key="b" :value="b">{{ b }} ({{ target.branches[b] }})</option></select>
+      <label>To</label><select v-model="tf.to"><option v-for="b in BRANCHES.filter((x) => x !== tf.from)" :key="b" :value="b">{{ b }} ({{ target.branches[b] }})</option></select>
+      <label>Quantity</label><input v-model.number="tf.qty" type="number" min="1" :max="target.branches[tf.from]" required />
+      <div class="row" style="margin-top: 20px; justify-content: flex-end">
+        <button type="button" class="btn ghost" @click="close">Cancel</button>
+        <button class="btn gold" :disabled="tf.from === tf.to">Transfer</button>
       </div>
     </form>
 

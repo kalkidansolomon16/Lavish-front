@@ -7,7 +7,7 @@ import { state, actions, clientName } from '../store'
   <div class="head">
     <div>
       <h1>Complaints</h1>
-      <p>Submitted by clients from the mobile app. Track each one to resolution.</p>
+      <p>Submitted by clients from the mobile app. The General Manager tracks each one to resolution.</p>
     </div>
   </div>
   <div class="grid">
