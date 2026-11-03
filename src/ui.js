@@ -34,7 +34,7 @@ export const ui = reactive({
 })
 
 const T = {
-  dashboard: 'ዳሽቦርድ', appointments: 'ቀጠሮዎች', payments: 'ክፍያዎች', clients: 'ደንበኞች', chat: 'ውይይት',
+  dashboard: 'ዳሽቦርድ', permissions: 'ፈቃዶች', appointments: 'ቀጠሮዎች', payments: 'ክፍያዎች', clients: 'ደንበኞች', chat: 'ውይይት',
   products: 'ምርቶች', orders: 'ትዕዛዞች', complaints: 'ቅሬታዎች', prescriptions: 'ማዘዣዎች', academy: 'አካዳሚ', staff: 'ሰራተኞች', news: 'ዜና', schedule: 'መርሃ ግብር', modules: 'ሞጁሎች', students: 'ተማሪዎች',
   welcome: 'እንኳን ደህና መጡ', upcoming: 'መጪ ቀጠሮዎች', revenue: 'የሳምንቱ ገቢ', mix: 'የሕክምና ዓይነቶች',
 }
@@ -75,8 +75,9 @@ export function startLive() {
       return ['Tigist Worku filed a complaint: Booking not confirmed', ['gm', 'ceo'], '/complaints']
     }],
     [68000, () => {
-      state.students.push({ id: Date.now(), name: 'Meklit Bogale', phone: '+251 918 40 22 61', courseId: 2, progress: 0, status: 'pending', msg: 'I would love to join the HydraFacial course.', certificate: null, chat: [] })
-      return ['Meklit Bogale applied to the Academy', ['gm', 'ceo'], '/academy']
+      const st = state.students.find((x) => x.name === 'Kidist Amare')
+      if (st?.login) st.login.activated = true
+      return ['Kidist Amare logged in to the app with the account you created', ['gm', 'ceo'], '/academy']
     }],
   ]
   events.forEach(([ms, run]) =>

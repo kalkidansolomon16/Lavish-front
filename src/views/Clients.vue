@@ -27,14 +27,14 @@ const rows = computed(() => state.clients.filter((c) => !isDoctor || c.doctorId 
           <td>{{ doctorName(c.doctorId) }}</td>
           <td>
             <a v-if="c.history" class="link" @click="ui.drawerClient = c.id">{{ c.history.concern || 'On file' }}</a>
-            <button v-else-if="can.editHistory(role)" class="btn ghost sm" @click="ui.drawerClient = c.id">+ Record history</button>
+            <button v-else-if="can('clients.history')" class="btn ghost sm" @click="ui.drawerClient = c.id">+ Record history</button>
             <span v-else class="note">Not recorded</span>
             <small v-if="c.history">{{ c.history.source }} · by {{ c.history.recordedBy }}</small>
           </td>
           <td>{{ c.lastTreatment }}</td>
           <td v-if="!isDoctor">
             <span v-if="c.app" class="badge active">Registered</span>
-            <div v-else class="row">
+            <div v-else-if="can('clients.invite')" class="row">
               <button class="btn ghost sm" @click="actions.sendAppInvite(c)">{{ c.invited ? 'Resend link' : 'Send app link' }}</button>
               <button class="btn gold sm" @click="actions.markRegistered(c)">Helped register ✓</button>
             </div>

@@ -1,12 +1,12 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { state, actions, clientName, doctorName, suggestDoctors, can } from '../store'
+import { state, actions, clientName, doctorName, suggestDoctors, doctorClashes, can, CLASS_MINS } from '../store'
 import { ui, pushNotif } from '../ui'
 import ClientLink from '../components/ClientLink.vue'
 import WalkIn from '../components/WalkIn.vue'
 
 const role = state.user.role
-const canApprove = can.approveAppointments(role)
+const canApprove = can('appointments.approve')
 const walkIn = ref(false)
 const tab = ref('all')
 const view = ref('calendar')
@@ -28,12 +28,31 @@ const days = Array.from({ length: 7 }, (_, i) => {
 })
 const hours = ['09', '10', '11', '12', '13', '14', '15', '16', '17']
 const at = (iso, h) => mine.value.filter((a) => a.date === iso && a.time.startsWith(h) && a.status !== 'declined')
+// Academy classes taught by the doctor(s) in view — shown on the same calendar so reception sees both.
+const classesAt = (iso, h) => state.sessions.filter((s) => (!docFilter.value || s.teacherId === docFilter.value) && s.date === iso && s.time.startsWith(h))
+const endOf = (t) => { const m = +t.slice(0, 2) * 60 + +t.slice(3, 5) + CLASS_MINS; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}` }
+
+// Before approving, cross-check the doctor's academy classes and other treatments.
+const clashes = (a) => (a.doctorId && a.status === 'pending' ? doctorClashes(a.doctorId, a.date, a.time, undefined, a.id) : [])
+const checking = ref(null)
+const dayPlan = computed(() => {
+  const a = checking.value
+  if (!a) return []
+  const classes = state.sessions.filter((s) => s.teacherId === a.doctorId && s.date === a.date)
+    .map((s) => ({ time: s.time, end: endOf(s.time), kind: 'Class', text: `${s.title} · ${s.room}` }))
+  const treatments = state.appointments.filter((x) => x.doctorId === a.doctorId && x.date === a.date && x.status === 'approved')
+    .map((x) => ({ time: x.time, kind: 'Treatment', text: `${clientName(x.clientId)} — ${x.service}` }))
+  return [...classes, ...treatments].sort((x, y) => x.time.localeCompare(y.time))
+})
 
 function approve(a) {
   if (!a.doctorId) return (assigning.value = a)
+  if (clashes(a).length) return (checking.value = a)
   actions.approveAppointment(a)
   pushNotif(`${clientName(a.clientId)} — ${a.service} on ${a.date} ${a.time} was approved`, ['doctor'], '/appointments', a.doctorId)
 }
+function reassign() { assigning.value = checking.value; checking.value = null }
+function decline() { actions.declineAppointment(checking.value); checking.value = null }
 function assign(d) {
   const a = assigning.value
   actions.assignDoctor(a, d)
@@ -81,9 +100,14 @@ function assign(d) {
         <tr v-for="h in hours" :key="h">
           <td class="hr">{{ h }}:00</td>
           <td v-for="d in days" :key="d.iso" :class="{ today: d.today }">
+            <div v-for="s in classesAt(d.iso, h)" :key="'c' + s.id" class="chip lesson">
+              <b>{{ s.time }}–{{ endOf(s.time) }}</b> 🎓 {{ doctorName(s.teacherId).replace('Dr. ', 'Dr ') }}
+              <small>Academy class · {{ s.title }}</small>
+            </div>
             <div v-for="a in at(d.iso, h)" :key="a.id" class="chip" :class="[a.status, { nodoc: !a.doctorId }]" @click="ui.drawerClient = a.clientId">
               <b>{{ a.time }}</b> {{ clientName(a.clientId) }}
               <small>{{ a.service }} · {{ a.doctorId ? doctorName(a.doctorId).replace('Dr. ', 'Dr ') : 'Needs doctor' }}</small>
+              <small v-if="clashes(a).length" class="clash">⚠ Doctor busy — {{ clashes(a)[0].kind === 'class' ? 'teaching' : 'treating' }}</small>
               <span v-if="canApprove && a.status === 'pending'" class="chip-actions" @click.stop>
                 <button @click="approve(a)">{{ a.doctorId ? '✓ Approve' : '✨ Assign doctor' }}</button>
               </span>
@@ -92,7 +116,7 @@ function assign(d) {
         </tr>
       </tbody>
     </table>
-    <p class="note" style="margin-top: 12px">Dashed = awaiting approval · solid teal = approved · click a booking to open the client profile.</p>
+    <p class="note" style="margin-top: 12px">Dashed = awaiting approval · solid teal = approved · gold 🎓 = academy class the doctor teaches · click a booking to open the client profile.</p>
   </div>
 
   <template v-else>
@@ -108,7 +132,8 @@ function assign(d) {
             <td>{{ a.service }}</td>
             <td>
               <span v-if="!a.doctorId" class="badge open">Needs doctor</span>
-              <template v-else>{{ doctorName(a.doctorId) }}<small v-if="a.notified">Doctor notified ✓</small></template>
+              <template v-else>{{ doctorName(a.doctorId) }}<small v-if="a.notified">Doctor notified ✓</small>
+                <small v-for="c in clashes(a)" :key="c.text" class="clash">⚠ {{ c.text }}</small></template>
             </td>
             <td>{{ a.date }}<small>{{ a.time }}</small></td>
             <td><span class="badge" :class="a.status">{{ a.status }}</span></td>
@@ -118,7 +143,7 @@ function assign(d) {
                 <button v-else class="btn gold sm" @click="approve(a)">Approve & notify</button>
                 <button class="btn danger sm" @click="actions.declineAppointment(a)">Decline</button>
               </template>
-              <button v-if="role === 'doctor' && a.status === 'approved'" class="btn sm" @click="actions.completeAppointment(a)">Mark treated</button>
+              <button v-if="can('appointments.complete') && a.status === 'approved' && a.doctorId === state.user.doctorId" class="btn sm" @click="actions.completeAppointment(a)">Mark treated</button>
             </td>
           </tr>
           <tr v-if="!rows.length"><td colspan="6" class="empty">No appointments</td></tr>
@@ -129,12 +154,38 @@ function assign(d) {
 
   <WalkIn v-if="walkIn" @close="walkIn = false" />
 
+  <div v-if="checking" class="modal-bg" @click.self="checking = null">
+    <div class="modal" style="width: min(560px, 95vw)">
+      <h2>Schedule conflict</h2>
+      <p class="note">{{ clientName(checking.clientId) }} · {{ checking.service }} · {{ checking.date }} at {{ checking.time }}</p>
+      <ul class="reasons" style="margin: 12px 0">
+        <li v-for="c in clashes(checking)" :key="c.text" class="no">✕ {{ c.text }}</li>
+      </ul>
+      <h3 style="margin-top: 14px">{{ doctorName(checking.doctorId) }}’s day — classes & treatments</h3>
+      <table style="margin-top: 6px">
+        <tbody>
+          <tr v-for="p in dayPlan" :key="p.kind + p.time + p.text">
+            <td><b>{{ p.time }}</b><small v-if="p.end">until {{ p.end }}</small></td>
+            <td><span class="badge" :class="p.kind === 'Class' ? 'pending' : 'approved'">{{ p.kind }}</span></td>
+            <td>{{ p.text }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="note" style="margin-top: 10px">Pick another doctor, or decline and ask the client for a different time.</p>
+      <div class="row" style="justify-content: flex-end; margin-top: 16px">
+        <button class="btn ghost" @click="checking = null">Cancel</button>
+        <button class="btn danger" @click="decline">Decline</button>
+        <button class="btn gold" @click="reassign">✨ Choose another doctor</button>
+      </div>
+    </div>
+  </div>
+
   <div v-if="assigning" class="modal-bg" @click.self="assigning = null">
     <div class="modal" style="width: min(680px, 95vw); max-height: 92vh; overflow: auto">
       <h2>Assign a doctor</h2>
       <div class="card" style="background: var(--bg); margin: 12px 0">
         <b>{{ clientName(assigning.clientId) }}</b> · {{ assigning.service }}
-        <p class="note">{{ assigning.date }} at {{ assigning.time }} · client did not choose a doctor
+        <p class="note">{{ assigning.date }} at {{ assigning.time }}{{ assigning.doctorId ? '' : ' · client did not choose a doctor' }}
           <span v-if="history.length"> · last treated: {{ history.at(-1).service }}</span></p>
       </div>
 

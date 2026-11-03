@@ -1,10 +1,11 @@
 // Mock data + actions. Everything here is a stand-in for Laravel API calls.
 // When the backend exists, replace each action with an axios call to /api/...
 import { reactive } from 'vue'
+import { LEVEL, DEFAULT_PERMS, PAGES, applies } from './permissions'
 
 // The six web portals.
 export const ROLES = {
-  ceo: { label: 'CEO', name: 'Selam Bekele', blurb: 'Full access — revenue, products, doctors, staff & news' },
+  ceo: { label: 'CEO', name: 'Dr. Melat Solomon', blurb: 'Full access — revenue, products, doctors, staff & news' },
   gm: { label: 'General Manager', name: 'Dawit Haile', blurb: 'Complaints, inventory & transfers, HR, academy & news' },
   reception: { label: 'Receptionist', name: 'Hana Tadesse', blurb: 'Appointments, walk-in intake & payments' },
   ecommerce: { label: 'Lavish E-commerce', name: 'Abel Girma', blurb: 'Products & prices, inventory, deliveries & order payments' },
@@ -12,26 +13,40 @@ export const ROLES = {
   teacher: { label: 'Academy Teacher', name: 'Dr. Meron Alemu', blurb: 'Your students, schedule, modules, videos & exercises', doctorId: 1 },
 }
 
-export const NAV = {
-  ceo: ['dashboard', 'appointments', 'payments', 'clients', 'products', 'orders', 'prescriptions', 'complaints', 'academy', 'staff', 'news'],
-  gm: ['dashboard', 'complaints', 'products', 'staff', 'academy', 'news'],
-  reception: ['dashboard', 'appointments', 'clients', 'payments'],
-  ecommerce: ['dashboard', 'products', 'orders', 'prescriptions'],
-  doctor: ['dashboard', 'appointments', 'clients', 'prescriptions', 'chat'],
-  teacher: ['dashboard', 'schedule', 'modules', 'students'],
-}
+// ---- permissions (see permissions.js) ----
+// Grants per role, editable in the Permissions page and saved in the browser for the demo.
+const savedPerms = JSON.parse(localStorage.getItem('lavish_perms') || 'null')
+const perms = reactive(savedPerms ?? structuredClone(DEFAULT_PERMS))
+perms.ceo = [...DEFAULT_PERMS.ceo] // the top of the hierarchy is never restricted
+const savePerms = () => localStorage.setItem('lavish_perms', JSON.stringify(perms))
 
-// Who may do what — one place so views stay consistent.
-export const can = {
-  seeRevenue: (r) => ['ceo', 'reception'].includes(r),
-  approveAppointments: (r) => ['ceo', 'reception'].includes(r),
-  editProducts: (r) => ['ceo', 'ecommerce'].includes(r),
-  transferStock: (r) => ['ceo', 'gm'].includes(r),
-  deliverOrders: (r) => ['ceo', 'ecommerce'].includes(r),
-  grantAccess: (r) => ['ceo', 'gm'].includes(r),
-  ban: (r) => r === 'ceo',
-  editHistory: (r) => ['ceo', 'reception'].includes(r),
+// Does `role` (default: the signed-in user) hold this permission?
+export const can = (key, role = state.user?.role) => !!role && perms[role]?.includes(key)
+
+// Pages in the sidebar — the dashboard is always there.
+export const nav = (role = state.user?.role) => PAGES.filter((p) => p === 'dashboard' || can('page.' + p, role))
+
+// Hierarchy rule: you may change a role's permission only if that role is below you,
+// you can manage permissions, you hold the permission yourself, and it applies to that role.
+export const canGrant = (role, key) => {
+  const me = state.user?.role
+  return can('permissions.manage') && LEVEL[me] < LEVEL[role] && can(key) && applies(key, role)
 }
+export function setPerm(role, key, on) {
+  if (!canGrant(role, key)) return notify('You can’t change that permission')
+  const list = perms[role]
+  if (on && !list.includes(key)) list.push(key)
+  if (!on) perms[role] = list.filter((k) => k !== key)
+  savePerms()
+}
+// Restores defaults for the roles below the current user.
+export function resetPerms() {
+  const me = state.user?.role
+  Object.keys(perms).filter((r) => LEVEL[r] > LEVEL[me]).forEach((r) => (perms[r] = [...DEFAULT_PERMS[r]]))
+  savePerms()
+  notify('Permissions reset to defaults')
+}
+export const rolePerms = perms
 
 export const BRANCHES = ['Addis Ababa – Bole', 'Addis Ababa – Kazanchis', 'Hawassa']
 const today = new Date().toISOString().slice(0, 10)
@@ -56,7 +71,7 @@ export const state = reactive({
   ],
 
   staff: [
-    { id: 1, name: 'Selam Bekele', role: 'ceo', position: 'Chief Executive Officer', branch: 'Addis Ababa – Bole', phone: '+251 911 00 11 22', status: 'active' },
+    { id: 1, name: 'Dr. Melat Solomon', role: 'ceo', position: 'Chief Executive Officer', branch: 'Addis Ababa – Bole', phone: '+251 911 00 11 22', status: 'active' },
     { id: 2, name: 'Hana Tadesse', role: 'reception', position: 'Front Desk', branch: 'Addis Ababa – Bole', phone: '+251 911 00 33 44', status: 'active' },
     { id: 3, name: 'Tsion Alemayehu', role: 'reception', position: 'Front Desk', branch: 'Addis Ababa – Kazanchis', phone: '+251 911 00 55 66', status: 'active' },
     { id: 4, name: 'Mekdes Tolera', role: 'reception', position: 'Front Desk', branch: 'Hawassa', phone: '+251 462 00 77 88', status: 'suspended' },
@@ -83,7 +98,8 @@ export const state = reactive({
     { id: 103, clientId: 1, doctorId: 1, service: 'Signature HydraFacial', date: today, time: '09:00', status: 'approved', notified: true },
     { id: 104, clientId: 6, doctorId: 1, service: 'Morpheus8 & Microneedling', date: today, time: '11:30', status: 'approved', notified: true },
     { id: 105, clientId: 4, doctorId: 2, service: 'Botox & Dermal Fillers', date: day(-3), time: '15:00', status: 'completed', notified: true },
-    { id: 106, clientId: 2, doctorId: 1, service: 'PRP Skin Rejuvenation', date: day(3), time: '16:00', status: 'pending', notified: false },
+    // Clashes with Dr. Meron's 10:00 class — reception sees the conflict before approving.
+    { id: 106, clientId: 2, doctorId: 1, service: 'PRP Skin Rejuvenation', date: day(1), time: '11:00', status: 'pending', notified: false },
     { id: 107, clientId: 5, doctorId: null, service: 'Body Contouring & Skin Tightening', date: day(1), time: '11:00', status: 'pending', notified: false },
     { id: 108, clientId: 3, doctorId: null, service: 'Signature HydraFacial', date: day(1), time: '10:00', status: 'pending', notified: false },
     { id: 109, clientId: 6, doctorId: null, service: 'Hair Restoration Solutions', date: day(2), time: '09:00', status: 'pending', notified: false },
@@ -149,22 +165,23 @@ export const state = reactive({
     { id: 4, courseId: 3, teacherId: 2, date: day(3), time: '09:00', title: 'Facial anatomy — cadaver lab', kind: 'Practical', room: 'Kazanchis lab' },
   ],
 
+  // `login` = app credentials the CEO handed over; `activated` once the student has logged in.
   students: [
-    { id: 1, name: 'Eden Fikru', phone: '+251 912 45 67 89', courseId: 1, progress: 62, status: 'active', msg: 'Can I reschedule Friday’s practical?', certificate: null,
+    { id: 1, name: 'Eden Fikru', phone: '+251 912 45 67 89', courseId: 1, progress: 62, status: 'active', msg: 'Can I reschedule Friday’s practical?', certificate: null, login: { username: '0912456789', via: 'In person', activated: true },
       chat: [{ from: 'teacher', text: 'Welcome to Foundations, Eden!', time: 'Sep 1' }, { from: 'student', text: 'Can I reschedule Friday’s practical?', time: 'Yesterday' }] },
-    { id: 2, name: 'Nahom Tilahun', phone: '+251 913 22 10 44', courseId: 3, progress: 15, status: 'active', msg: '', certificate: null, chat: [] },
-    { id: 3, name: 'Kidist Amare', phone: '+251 914 88 21 07', courseId: 2, progress: 0, status: 'pending', msg: 'Hello, I would like to enrol in the next intake.', certificate: null, chat: [] },
-    { id: 4, name: 'Bethel Zewdu', phone: '+251 915 60 33 12', courseId: 1, progress: 0, status: 'pending', msg: '', certificate: null, chat: [] },
-    { id: 5, name: 'Hanna Mulugeta', phone: '+251 916 74 09 55', courseId: 2, progress: 100, status: 'completed', msg: 'Thank you for everything!', certificate: null,
+    { id: 2, name: 'Nahom Tilahun', phone: '+251 913 22 10 44', courseId: 3, progress: 15, status: 'active', msg: '', certificate: null, login: { username: '0913221044', via: 'Phone call', activated: true }, chat: [] },
+    { id: 3, name: 'Kidist Amare', phone: '+251 914 88 21 07', courseId: 2, progress: 0, status: 'active', msg: '', certificate: null, login: { username: '0914882107', via: 'Phone call', activated: false }, chat: [] },
+    { id: 4, name: 'Bethel Zewdu', phone: '+251 915 60 33 12', courseId: 1, progress: 0, status: 'active', msg: '', certificate: null, login: { username: '0915603312', via: 'In person', activated: false }, chat: [] },
+    { id: 5, name: 'Hanna Mulugeta', phone: '+251 916 74 09 55', courseId: 2, progress: 100, status: 'completed', msg: 'Thank you for everything!', certificate: null, login: { username: '0916740955', via: 'In person', activated: true },
       chat: [{ from: 'student', text: 'I passed the practical assessment 🎉', time: 'Mon' }, { from: 'teacher', text: 'Congratulations Hanna — well deserved!', time: 'Mon' }] },
-    { id: 6, name: 'Selamawit Girma', phone: '+251 917 12 98 30', courseId: 2, progress: 48, status: 'active', msg: '', certificate: null, chat: [] },
+    { id: 6, name: 'Selamawit Girma', phone: '+251 917 12 98 30', courseId: 2, progress: 48, status: 'active', msg: '', certificate: null, login: { username: '0917129830', via: 'Phone call', activated: true }, chat: [] },
   ],
 
   // Shown on the client Home screen in the mobile app. Posted by the CEO or General Manager.
   news: [
-    { id: 1, title: 'New: Morpheus8 now at Kazanchis', body: 'Our most requested skin-tightening treatment is now available at the Kazanchis branch. Book from the app.', tag: 'New treatment', date: day(-1), by: 'Selam Bekele', published: true },
+    { id: 1, title: 'New: Morpheus8 now at Kazanchis', body: 'Our most requested skin-tightening treatment is now available at the Kazanchis branch. Book from the app.', tag: 'New treatment', date: day(-1), by: 'Dr. Melat Solomon', published: true },
     { id: 2, title: '20% off aftercare this week', body: 'All Aftercare products are 20% off in the Lavish shop until Sunday.', tag: 'Offer', date: day(-3), by: 'Dawit Haile', published: true },
-    { id: 3, title: 'Academy: December intake open', body: 'Applications for the December Foundations intake are now open in the app.', tag: 'Academy', date: day(-6), by: 'Dawit Haile', published: false },
+    { id: 3, title: 'Academy: December intake open', body: 'Enrolment for the December Foundations intake is open — visit the academy or call to register.', tag: 'Academy', date: day(-6), by: 'Dawit Haile', published: false },
   ],
 
   movements: [
@@ -174,11 +191,11 @@ export const state = reactive({
     { id: 4, productId: 3, type: 'sold', qty: -20, balance: 5, reason: 'Orders delivered', ref: 'Monthly', by: 'Abel Girma', date: day(-5) },
     { id: 5, productId: 4, type: 'sold', qty: -6, balance: 18, reason: 'Orders delivered', ref: 'Weekly', by: 'Abel Girma', date: day(-7) },
     { id: 6, productId: 5, type: 'sold', qty: -12, balance: 0, reason: 'Orders delivered', ref: 'Monthly', by: 'Abel Girma', date: day(-4) },
-    { id: 7, productId: 1, type: 'in', qty: 40, balance: 40, reason: 'Stock received', ref: 'Opening stock', by: 'Selam Bekele', date: day(-20) },
-    { id: 8, productId: 2, type: 'in', qty: 30, balance: 30, reason: 'Stock received', ref: 'Opening stock', by: 'Selam Bekele', date: day(-20) },
-    { id: 9, productId: 3, type: 'in', qty: 25, balance: 25, reason: 'Stock received', ref: 'Opening stock', by: 'Selam Bekele', date: day(-20) },
-    { id: 10, productId: 4, type: 'in', qty: 24, balance: 24, reason: 'Stock received', ref: 'Opening stock', by: 'Selam Bekele', date: day(-20) },
-    { id: 11, productId: 5, type: 'in', qty: 12, balance: 12, reason: 'Stock received', ref: 'Opening stock', by: 'Selam Bekele', date: day(-20) },
+    { id: 7, productId: 1, type: 'in', qty: 40, balance: 40, reason: 'Stock received', ref: 'Opening stock', by: 'Dr. Melat Solomon', date: day(-20) },
+    { id: 8, productId: 2, type: 'in', qty: 30, balance: 30, reason: 'Stock received', ref: 'Opening stock', by: 'Dr. Melat Solomon', date: day(-20) },
+    { id: 9, productId: 3, type: 'in', qty: 25, balance: 25, reason: 'Stock received', ref: 'Opening stock', by: 'Dr. Melat Solomon', date: day(-20) },
+    { id: 10, productId: 4, type: 'in', qty: 24, balance: 24, reason: 'Stock received', ref: 'Opening stock', by: 'Dr. Melat Solomon', date: day(-20) },
+    { id: 11, productId: 5, type: 'in', qty: 12, balance: 12, reason: 'Stock received', ref: 'Opening stock', by: 'Dr. Melat Solomon', date: day(-20) },
   ],
 
   prescriptions: [
@@ -186,6 +203,13 @@ export const state = reactive({
       items: [{ productId: 2, qty: 1, instructions: 'Apply twice daily, morning and night' }, { productId: 3, qty: 2, instructions: 'Every morning, reapply after 3 hours outdoors' }] },
     { id: 2, clientId: 4, doctorId: 2, date: day(-3), status: 'ordered', note: 'Post-filler care.',
       items: [{ productId: 4, qty: 1, instructions: 'Thin layer on treated area 2× daily for 5 days' }] },
+    // `waiting` = the Lavish product was out of stock when prescribed; the doctor suggests it again once it's back.
+    // `custom` = a medicine Lavish doesn't sell — the client buys it at a pharmacy.
+    { id: 3, clientId: 6, doctorId: 1, date: day(-12), status: 'sent', note: 'Protect the treated skin from the sun for 4 weeks.',
+      items: [{ productId: 3, qty: 1, instructions: 'Every morning, reapply after 3 hours outdoors', waiting: true },
+        { productId: null, custom: 'Tranexamic acid 250 mg tablets', qty: 1, instructions: '1 tablet twice daily for 8 weeks' }] },
+    { id: 4, clientId: 2, doctorId: 1, date: day(-5), status: 'sent', note: 'Support hair growth between PRP sessions.',
+      items: [{ productId: 5, qty: 1, instructions: 'Massage into scalp every evening', waiting: true }] },
   ],
 
   chats: {
@@ -203,6 +227,23 @@ export const clientName = (id) => state.clients.find((c) => c.id === id)?.name ?
 export const doctorName = (id) => state.doctors.find((d) => d.id === id)?.name ?? 'Unassigned'
 export const courseTitle = (id) => state.courses.find((c) => c.id === id)?.title ?? ''
 export const etb = (n) => `ETB ${n.toLocaleString()}`
+
+// Doctors who also teach have one calendar: academy classes and treatments must not overlap.
+export const CLASS_MINS = 120
+export const TREATMENT_MINS = 60
+const toMins = (t) => +t.slice(0, 2) * 60 + +t.slice(3, 5)
+const fmt = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+const overlaps = (t1, len1, t2, len2) => toMins(t1) < toMins(t2) + len2 && toMins(t2) < toMins(t1) + len1
+// What the doctor is already committed to during [time, time + length) on that date.
+export function doctorClashes(doctorId, date, time, length = TREATMENT_MINS, skipApptId) {
+  const classes = state.sessions
+    .filter((s) => s.teacherId === doctorId && s.date === date && overlaps(time, length, s.time, CLASS_MINS))
+    .map((s) => ({ kind: 'class', text: `Teaching “${s.title}” ${s.time}–${fmt(toMins(s.time) + CLASS_MINS)} · ${s.room}` }))
+  const treatments = state.appointments
+    .filter((a) => a.id !== skipApptId && a.doctorId === doctorId && a.status === 'approved' && a.date === date && overlaps(time, length, a.time, TREATMENT_MINS))
+    .map((a) => ({ kind: 'treatment', text: `Treating ${clientName(a.clientId)} — ${a.service} at ${a.time}` }))
+  return [...classes, ...treatments]
+}
 
 // Ranks doctors for an appointment the client left unassigned.
 export function suggestDoctors(appt) {
@@ -223,7 +264,9 @@ export function suggestDoctors(appt) {
     else reasons.push({ ok: false, text: `Not a ${appt.service} specialist (${d.specialty})` })
 
     const clash = state.appointments.some((a) => active(a) && a.doctorId === d.id && a.date === appt.date && a.time === appt.time)
-    if (clash) { available = false; reasons.push({ ok: false, text: `Already booked at ${appt.time}` }) }
+    const teaching = doctorClashes(d.id, appt.date, appt.time).find((c) => c.kind === 'class')
+    if (teaching) { available = false; reasons.push({ ok: false, text: teaching.text }) }
+    else if (clash) { available = false; reasons.push({ ok: false, text: `Already booked at ${appt.time}` }) }
     else if (isToday && d.status !== 'Available') { available = false; reasons.push({ ok: false, text: `${d.status} today` }) }
     else { score += 30; reasons.push({ ok: true, text: `Free at ${appt.time}` }) }
 
@@ -268,6 +311,9 @@ function takeFromBranches(p, qty) {
     p.branches[b] -= n; qty -= n
   }
 }
+
+// Temporary password the student must change at first login.
+const tempPassword = () => 'LA-' + Math.random().toString(36).slice(2, 6).toUpperCase() + Math.floor(10 + Math.random() * 90)
 
 export const actions = {
   assignDoctor(a, d) {
@@ -322,15 +368,25 @@ export const actions = {
     return low
   },
   updateComplaint(c, status) { c.status = status; notify(`Complaint ${status}`) },
-  decideStudent(s, ok) { s.status = ok ? 'active' : 'rejected'; notify(ok ? 'Student enrolled' : 'Application declined') },
   addPrescription(rx) {
     state.prescriptions.unshift({ id: Date.now(), date: today, status: 'sent', ...rx })
     notify('Prescription sent to the client’s mobile app')
   },
+  // A doctor re-suggests a product that was out of stock when they prescribed it. Arrives in the client's chat.
+  suggestRestocked(rx, item) {
+    const p = state.products.find((x) => x.id === item.productId)
+    if (!state.chats[rx.clientId]) state.chats[rx.clientId] = []
+    state.chats[rx.clientId].push({ from: 'doctor', text: `Good news — ${p.name}, which I prescribed for you, is back in stock. You can order it from the Shop in the app. (${item.instructions || 'Use as directed'})`, time: 'now' })
+    item.suggested = true
+    notify(`Suggestion sent to ${clientName(rx.clientId)}’s app`)
+  },
   fulfillPrescription(rx) {
-    const lines = rx.items.map((i) => ({ p: state.products.find((x) => x.id === i.productId), qty: i.qty }))
+    // Only Lavish products can be ordered; outside medicines are bought at a pharmacy.
+    const items = rx.items.filter((i) => i.productId)
+    if (!items.length) return notify('Nothing to order — all items are outside Lavish products')
+    const lines = items.map((i) => ({ p: state.products.find((x) => x.id === i.productId), qty: i.qty }))
     state.orders.unshift({
-      id: Date.now() % 100000, clientId: rx.clientId, date: today, status: 'placed', address: 'To be confirmed with client', lines: rx.items.map((i) => ({ productId: i.productId, qty: i.qty })),
+      id: Date.now() % 100000, clientId: rx.clientId, date: today, status: 'placed', address: 'To be confirmed with client', lines: items.map((i) => ({ productId: i.productId, qty: i.qty })),
       items: lines.map((l) => `${l.p.name} ×${l.qty}`).join(', '), total: lines.reduce((t, l) => t + l.p.price * l.qty, 0),
     })
     rx.status = 'ordered'
@@ -383,6 +439,21 @@ export const actions = {
   deleteNews(n) { state.news = state.news.filter((x) => x !== n); notify('News removed') },
 
   // ---- academy ----
+  // CEO enrols a student and creates their app login. Returns the one-time password to hand over.
+  addStudent({ name, phone, courseId, via }) {
+    const password = tempPassword()
+    const username = phone.replace(/\D/g, '').replace(/^251/, '0')
+    state.students.unshift({ id: Date.now(), name, phone, courseId, progress: 0, status: 'active', msg: '', certificate: null, login: { username, via, activated: false }, chat: [] })
+    notify(`${name} enrolled — app login created`)
+    return { name, username, password }
+  },
+  smsStudentLogin(c) { notify(`Login details sent by SMS to ${c.name}`) },
+  // When a student forgets their password they call the CEO, who issues a new one.
+  resetStudentPassword(st) {
+    st.login.activated = false
+    notify(`New password created for ${st.name}`)
+    return { name: st.name, username: st.login.username, password: tempPassword() }
+  },
   addModule(c, title) {
     const week = c.modules.length + 1
     c.modules.push({ id: Date.now(), week, title, video: null, exercise: null, published: false })
@@ -398,4 +469,36 @@ export const actions = {
     st.certificate = { no: 'LA-' + new Date().getFullYear() + '-' + String(st.id).padStart(4, '0'), date: today, by: state.user.name }
     notify(`Certificate issued — PDF sent to ${st.name}’s app`)
   },
+}
+
+// Every action checks its permission, so a hidden button isn't the only line of defence.
+// A function entry picks the permission from the arguments.
+const ACTION_PERMS = {
+  assignDoctor: 'appointments.approve', approveAppointment: 'appointments.approve', declineAppointment: 'appointments.approve', walkIn: 'appointments.approve',
+  completeAppointment: 'appointments.complete',
+  markPaid: 'payments.collect',
+  addProduct: 'products.edit', receiveStock: 'products.edit', setPrice: 'products.edit', adjustStock: 'products.edit', deleteProduct: 'products.edit',
+  transferStock: 'products.transfer',
+  confirmDelivery: 'orders.deliver', markOrderPaid: 'orders.deliver',
+  updateComplaint: 'complaints.manage',
+  addPrescription: 'prescriptions.create', suggestRestocked: 'prescriptions.create',
+  fulfillPrescription: 'prescriptions.fulfil',
+  addStaff: 'staff.add',
+  toggleStaff: (m) => (m.status === 'active' ? 'staff.suspend' : 'staff.add'),
+  setDoctorAccess: (d, access) => (access === 'banned' || d.access === 'banned' ? 'doctors.ban' : 'doctors.grant'),
+  sendChat: 'page.chat',
+  sendAppInvite: 'clients.invite', markRegistered: 'clients.invite',
+  addNews: 'news.publish', toggleNews: 'news.publish', deleteNews: 'news.publish',
+  addStudent: 'academy.students', resetStudentPassword: 'academy.students', smsStudentLogin: 'academy.students',
+  addModule: 'academy.paths', setTeachers: 'academy.paths',
+  saveLesson: 'academy.teach', publishModule: 'academy.teach', addSession: 'academy.teach', setProgress: 'academy.teach', messageStudent: 'academy.teach',
+  issueCertificate: 'academy.certificates',
+}
+for (const [name, need] of Object.entries(ACTION_PERMS)) {
+  const run = actions[name]
+  actions[name] = (...args) => {
+    const key = typeof need === 'function' ? need(...args) : need
+    if (!can(key)) return notify('You don’t have permission to do that')
+    return run(...args)
+  }
 }

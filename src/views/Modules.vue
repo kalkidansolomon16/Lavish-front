@@ -1,7 +1,7 @@
 <script setup>
 // Teachers fill the modules the General Manager defined with a video and an exercise.
 import { ref, computed } from 'vue'
-import { state, actions } from '../store'
+import { state, actions, can } from '../store'
 
 const me = state.user.doctorId
 const myCourses = computed(() => state.courses.filter((c) => c.teacherIds.includes(me)))
@@ -42,8 +42,8 @@ function save() {
         <span class="asset" :class="{ missing: !m.exercise }">✎ {{ m.exercise ? m.exercise.title + ' · due ' + m.exercise.due : 'Add an exercise' }}</span>
       </div>
       <div class="row">
-        <button class="btn ghost sm" @click="edit(m)">Edit content</button>
-        <button class="btn sm" :class="m.published ? 'ghost' : 'gold'" :disabled="!m.video && !m.published" @click="actions.publishModule(m)">{{ m.published ? 'Unpublish' : 'Publish' }}</button>
+        <template v-if="can('academy.teach')"><button class="btn ghost sm" @click="edit(m)">Edit content</button>
+        <button class="btn sm" :class="m.published ? 'ghost' : 'gold'" :disabled="!m.video && !m.published" @click="actions.publishModule(m)">{{ m.published ? 'Unpublish' : 'Publish' }}</button></template>
       </div>
     </div>
   </div>

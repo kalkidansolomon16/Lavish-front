@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { state, actions, courseTitle } from '../store'
+import { state, actions, courseTitle, clientName, doctorClashes, CLASS_MINS, can } from '../store'
 
 const me = state.user.doctorId
 const myCourses = computed(() => state.courses.filter((c) => c.teacherIds.includes(me)))
@@ -10,8 +10,12 @@ const students = (courseId) => state.students.filter((s) => s.courseId === cours
 const open = ref(false)
 const blank = () => ({ courseId: myCourses.value[0]?.id, title: '', kind: 'Practical', date: new Date(Date.now() + 864e5).toISOString().slice(0, 10), time: '10:00', room: 'Bole training room' })
 const form = ref(blank())
+// A teacher is also a doctor — a class can't overlap treatments reception already approved.
+const busy = computed(() => doctorClashes(me, form.value.date, form.value.time, CLASS_MINS))
+const treatments = computed(() => state.appointments.filter((a) => a.doctorId === me && a.status === 'approved' && a.date >= new Date().toISOString().slice(0, 10))
+  .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)))
 function save() {
-  if (!form.value.title.trim()) return
+  if (!form.value.title.trim() || busy.value.length) return
   actions.addSession({ ...form.value, teacherId: me })
   form.value = blank()
   open.value = false
@@ -22,9 +26,9 @@ function save() {
   <div class="head">
     <div>
       <h1>Schedule</h1>
-      <p>Classes for the courses you teach. Students see these in the mobile app and get a reminder.</p>
+      <p>Classes for the courses you teach. Students see these in the mobile app and get a reminder. Reception sees your classes too, so no treatment is booked over them.</p>
     </div>
-    <button class="btn gold" @click="open = true">+ Add class</button>
+    <button v-if="can('academy.teach')" class="btn gold" @click="open = true">+ Add class</button>
   </div>
 
   <div class="card">
@@ -44,6 +48,21 @@ function save() {
     </table>
   </div>
 
+  <div class="card" style="margin-top: 16px">
+    <h2>Your upcoming treatments</h2>
+    <p class="note">Approved by reception — plan classes around these.</p>
+    <table style="margin-top: 8px">
+      <tbody>
+        <tr v-for="a in treatments" :key="a.id">
+          <td><b>{{ a.date }}</b><small>{{ a.time }}</small></td>
+          <td>{{ clientName(a.clientId) }}</td>
+          <td>{{ a.service }}</td>
+        </tr>
+        <tr v-if="!treatments.length"><td colspan="3" class="empty">No upcoming treatments</td></tr>
+      </tbody>
+    </table>
+  </div>
+
   <div v-if="open" class="modal-bg" @click.self="open = false">
     <form class="modal" @submit.prevent="save">
       <h2>Add class</h2>
@@ -54,10 +73,11 @@ function save() {
         <div><label>Date</label><input v-model="form.date" type="date" /></div>
         <div><label>Time</label><input v-model="form.time" type="time" /></div>
       </div>
+      <p v-for="c in busy" :key="c.text" class="note" style="color: var(--bad); margin-top: 8px">⚠ Clashes with: {{ c.text }}</p>
       <label>Room or link</label><input v-model="form.room" />
       <div class="row" style="margin-top: 18px; justify-content: flex-end">
         <button type="button" class="btn ghost" @click="open = false">Cancel</button>
-        <button class="btn gold">Add & notify students</button>
+        <button class="btn gold" :disabled="busy.length">Add & notify students</button>
       </div>
     </form>
   </div>

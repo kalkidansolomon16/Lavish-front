@@ -11,7 +11,7 @@ const myDoc = state.user.doctorId
 const todayStr = new Date().toISOString().slice(0, 10)
 const count = (list, fn) => list.filter(fn).length
 const myCourses = computed(() => state.courses.filter((c) => c.teacherIds.includes(myDoc)).map((c) => c.id))
-const myStudents = computed(() => state.students.filter((s) => myCourses.value.includes(s.courseId) && s.status !== 'pending'))
+const myStudents = computed(() => state.students.filter((s) => myCourses.value.includes(s.courseId)))
 
 const stats = computed(() => {
   const s = state
@@ -97,7 +97,7 @@ const hasAppts = ['ceo', 'reception', 'doctor'].includes(role)
   </div>
 
   <div class="grid g2" style="margin-top: 20px">
-    <div v-if="can.seeRevenue(role)" class="card">
+    <div v-if="can('finance.revenue')" class="card">
       <h2>{{ t('revenue') }} <small class="note">ETB</small></h2>
       <BarChart :data="ui.revenue" money />
     </div>

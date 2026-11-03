@@ -1,10 +1,10 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { state, actions, etb, reserved, can, BRANCHES } from '../store'
-import { exportCsv } from '../ui'
+import { state, actions, etb, reserved, can, BRANCHES, clientName } from '../store'
+import { exportCsv, pushNotif } from '../ui'
 
 const role = state.user.role
-const edit = can.editProducts(role)
+const edit = can('products.edit')
 const short = (b) => b.replace('Addis Ababa – ', '')
 const modal = ref(null) // 'new' | 'restock' | 'adjust' | 'history' | 'transfer'
 const tf = ref({ from: BRANCHES[0], to: BRANCHES[1], qty: 1 })
@@ -41,7 +41,15 @@ function saveNew() {
   actions.addProduct({ ...form.value, price: +form.value.price, stock: +form.value.stock })
   form.value = blank(); close()
 }
-function saveRestock() { if (qty.value > 0) { actions.receiveStock(target.value, +qty.value, ref_.value, branch.value); close() } }
+function saveRestock() {
+  if (!(qty.value > 0)) return
+  const p = target.value, wasOut = p.stock === 0
+  actions.receiveStock(p, +qty.value, ref_.value, branch.value)
+  // Tell each doctor whose patient was waiting for this product, so they can suggest it.
+  if (wasOut) state.prescriptions.filter((rx) => rx.items.some((i) => i.productId === p.id && i.waiting && !i.suggested))
+    .forEach((rx) => pushNotif(`${p.name} is back in stock — suggest it to ${clientName(rx.clientId)}`, ['doctor'], '/prescriptions', rx.doctorId))
+  close()
+}
 function saveTransfer() { actions.transferStock(target.value, tf.value.from, tf.value.to, +tf.value.qty); close() }
 function saveAdjust() { actions.adjustStock(target.value, Math.max(0, +counted.value), reason.value); close() }
 
@@ -66,7 +74,7 @@ const exportAll = () =>
 
   <div class="grid g4" style="margin-bottom: 20px">
     <div class="card stat gold"><div class="n">{{ units }}</div><div class="l">Units on hand</div></div>
-    <div v-if="can.seeRevenue(role) || edit" class="card stat"><div class="n">{{ etb(value) }}</div><div class="l">Stock value (retail)</div></div>
+    <div v-if="can('finance.revenue') || edit" class="card stat"><div class="n">{{ etb(value) }}</div><div class="l">Stock value (retail)</div></div>
     <div v-else class="card stat"><div class="n">{{ state.products.length }}</div><div class="l">Products listed</div></div>
     <div class="card stat"><div class="n">{{ reservedTotal }}</div><div class="l">Reserved for open orders</div></div>
     <div class="card stat"><div class="n" :style="{ color: lowCount ? 'var(--bad)' : '' }">{{ lowCount }}</div><div class="l">Need reorder</div></div>
@@ -95,7 +103,7 @@ const exportAll = () =>
           <td class="row">
             <button v-if="edit" class="btn gold sm" @click="open('restock', p)">+ Receive</button>
             <button v-if="edit" class="btn ghost sm" @click="open('adjust', p)">Adjust</button>
-            <button v-if="can.transferStock(role)" class="btn gold sm" @click="open('transfer', p)">⇄ Transfer</button>
+            <button v-if="can('products.transfer')" class="btn gold sm" @click="open('transfer', p)">⇄ Transfer</button>
             <button class="btn ghost sm" @click="open('history', p)">History</button>
           </td>
         </tr>

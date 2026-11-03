@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { state, actions } from '../store'
+import { state, actions, can } from '../store'
 
 const TAGS = ['New treatment', 'Offer', 'Academy', 'Announcement']
 const open = ref(false)
@@ -18,9 +18,9 @@ function save() {
   <div class="head">
     <div>
       <h1>News</h1>
-      <p>Published news appears on the client Home screen in the mobile app. Only the CEO and General Manager can post.</p>
+      <p>Published news appears on the client Home screen in the mobile app. Posting needs the “Post news” permission.</p>
     </div>
-    <button class="btn gold" @click="open = true">+ Post news</button>
+    <button v-if="can('news.publish')" class="btn gold" @click="open = true">+ Post news</button>
   </div>
 
   <div class="grid g2">
@@ -32,7 +32,7 @@ function save() {
       <h2 style="margin-top: 10px">{{ n.title }}</h2>
       <p style="margin: 6px 0 10px">{{ n.body }}</p>
       <p class="note">{{ n.date }} · by {{ n.by }}</p>
-      <div class="row" style="margin-top: 12px">
+      <div v-if="can('news.publish')" class="row" style="margin-top: 12px">
         <button class="btn sm" :class="n.published ? 'ghost' : 'gold'" @click="actions.toggleNews(n)">{{ n.published ? 'Unpublish' : 'Publish' }}</button>
         <button class="btn danger sm" @click="actions.deleteNews(n)">Delete</button>
       </div>

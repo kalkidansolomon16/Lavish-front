@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { state, NAV, logout } from './store'
+import { state, nav, logout } from './store'
 import { ui, t, startLive } from './ui'
 import Topbar from './components/Topbar.vue'
 import ClientDrawer from './components/ClientDrawer.vue'
@@ -25,7 +25,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', hotkey))
     <aside class="side">
       <div class="brand"><img src="/img/logo-white.png" alt="Lavish Medical Spa" /><small>{{ state.user.label.toUpperCase() }} PORTAL</small></div>
       <nav>
-        <RouterLink v-for="n in NAV[state.user.role]" :key="n" :to="'/' + n">{{ t(n) }}</RouterLink>
+        <RouterLink v-for="n in nav()" :key="n" :to="'/' + n">{{ t(n) }}</RouterLink>
       </nav>
       <div class="me">
         <b>{{ state.user.name }}</b>{{ state.user.label }}

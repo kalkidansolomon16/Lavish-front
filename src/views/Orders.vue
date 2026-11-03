@@ -1,6 +1,6 @@
 <script setup>
 import ClientLink from '../components/ClientLink.vue'
-import { state, actions, clientName, etb } from '../store'
+import { state, actions, clientName, etb, can } from '../store'
 import { exportCsv, pushNotif } from '../ui'
 
 const product = (id) => state.products.find((p) => p.id === id)
@@ -38,11 +38,11 @@ const exportAll = () => exportCsv('lavish-orders', state.orders.map((o) => ({ Or
           <td>
             <span class="badge" :class="o.payment === 'paid' ? 'paid' : 'unpaid'">{{ o.payment === 'paid' ? 'paid' : 'not paid' }}</span>
             <small>{{ o.method || '—' }}</small>
-            <button v-if="o.payment !== 'paid'" class="btn ghost sm" style="margin-top: 4px" @click="actions.markOrderPaid(o)">Mark paid</button>
+            <button v-if="o.payment !== 'paid' && can('orders.deliver')" class="btn ghost sm" style="margin-top: 4px" @click="actions.markOrderPaid(o)">Mark paid</button>
           </td>
           <td>{{ o.address }}</td>
           <td><span class="badge" :class="o.status">{{ o.status }}</span><small v-if="o.notified">Client notified ✓</small></td>
-          <td><button v-if="o.status === 'placed'" class="btn gold sm" @click="deliver(o)">Confirm delivery</button></td>
+          <td><button v-if="o.status === 'placed' && can('orders.deliver')" class="btn gold sm" @click="deliver(o)">Confirm delivery</button></td>
         </tr>
       </tbody>
     </table>

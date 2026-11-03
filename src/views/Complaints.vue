@@ -1,6 +1,6 @@
 <script setup>
 import ClientLink from '../components/ClientLink.vue'
-import { state, actions, clientName } from '../store'
+import { state, actions, clientName, can } from '../store'
 </script>
 
 <template>
@@ -22,8 +22,8 @@ import { state, actions, clientName } from '../store'
       <p class="note"><ClientLink :id="c.clientId" /> · {{ c.date }}</p>
       <p style="margin: 10px 0">{{ c.message }}</p>
       <label>Response to client</label>
-      <input v-model="c.reply" placeholder="Write a reply…" />
-      <div class="row" style="margin-top: 12px">
+      <input v-model="c.reply" placeholder="Write a reply…" :disabled="!can('complaints.manage')" />
+      <div v-if="can('complaints.manage')" class="row" style="margin-top: 12px">
         <button class="btn ghost sm" :disabled="c.status === 'in-review'" @click="actions.updateComplaint(c, 'in-review')">Mark in review</button>
         <button class="btn gold sm" :disabled="c.status === 'resolved'" @click="actions.updateComplaint(c, 'resolved')">Resolve</button>
       </div>

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { state, notify, clientName, etb } from '../store'
+import { state, notify, clientName, etb, can } from '../store'
 import { ui, exportCsv, pushNotif } from '../ui'
 import ClientLink from '../components/ClientLink.vue'
 
@@ -84,7 +84,7 @@ const exportAll = () =>
           <td>{{ p.status === 'paid' ? p.method : '—' }}<small v-if="p.txRef">Ref {{ p.txRef }}</small></td>
           <td><span class="badge" :class="p.status">{{ p.status === 'awaiting' ? 'awaiting client' : p.status }}</span></td>
           <td class="row">
-            <button v-if="p.status === 'unpaid'" class="btn gold sm" @click="open(p)">Collect payment</button>
+            <button v-if="p.status === 'unpaid' && can('payments.collect')" class="btn gold sm" @click="open(p)">Collect payment</button>
             <button v-else-if="p.status === 'awaiting'" class="btn ghost sm" @click="open(p)">View link</button>
             <button v-else class="btn ghost sm" @click="receipt = p">Receipt</button>
           </td>

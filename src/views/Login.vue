@@ -14,7 +14,7 @@ const enter = (r) => { login(r); router.push('/dashboard') }
       <div class="hero-copy">
         <span class="eyebrow">LAVISH STAFF PORTAL</span>
         <h2>Ultra Luxury in Science and Beauty.</h2>
-        <p>Six portals — CEO, General Manager, Reception, E-commerce, Doctors and Academy — connected to the Lavish mobile app.</p>
+        <p>Six portals — CEO, General Manager, Reception, E-commerce, Doctors and Academy Teacher — connected to the Lavish mobile app.</p>
       </div>
 
       <div class="floaters">

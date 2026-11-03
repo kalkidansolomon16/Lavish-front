@@ -1,11 +1,12 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { state, actions, ROLES, BRANCHES, can, courseTitle } from '../store'
+import { LEVEL } from '../permissions'
 
 const me = state.user.role
 const roleLabel = (r) => (r === 'doctor' ? 'Doctor' : ROLES[r].label)
-// The CEO can create any role (including the GM); the GM gives access to doctors, receptionists and e-commerce.
-const creatable = me === 'ceo' ? ['doctor', 'gm', 'reception', 'ecommerce'] : ['doctor', 'reception', 'ecommerce']
+// You can only add people to roles below you in the hierarchy (the CEO can add a GM; the GM can't).
+const creatable = ['doctor', 'gm', 'reception', 'ecommerce'].filter((r) => LEVEL[r] > LEVEL[me])
 const tab = ref('all')
 const open = ref(false)
 const blank = () => ({ name: '', role: 'doctor', position: '', branch: BRANCHES[0], phone: '' })
@@ -20,8 +21,8 @@ const rows = computed(() => everyone.value.filter((r) => tab.value === 'all' || 
 const count = (r) => (r === 'all' ? everyone.value.length : everyone.value.filter((x) => x.role === r).length)
 const initials = (n) => n.replace('Dr. ', '').split(' ').map((w) => w[0]).join('')
 const pendingDocs = computed(() => state.doctors.filter((d) => d.access === 'pending'))
-// GM may reactivate but not suspend; nobody suspends the CEO or themselves.
-const canToggle = (m) => m.role !== 'ceo' && m.name !== state.user.name && (can.ban(me) || m.status !== 'active')
+// Only people below you, never yourself; suspending and reactivating are separate permissions.
+const canToggle = (m) => LEVEL[m.role] > LEVEL[me] && m.name !== state.user.name && can(m.status === 'active' ? 'staff.suspend' : 'staff.add')
 
 function save() {
   if (!form.value.name.trim()) return
@@ -36,12 +37,12 @@ function save() {
     <div>
       <h1>{{ me === 'gm' ? 'Staff · HR' : 'Staff & access' }}</h1>
       <p>Everyone who works at Lavish. Doctors with access appear in the mobile app for clients to book.
-        <template v-if="me === 'gm'"> You can give access; only the CEO can ban.</template></p>
+        <template v-if="!can('doctors.ban') && can('doctors.grant')"> You can give access; banning needs a higher permission.</template></p>
     </div>
-    <button class="btn gold" @click="open = true">+ Add & give access</button>
+    <button v-if="can('staff.add') && creatable.length" class="btn gold" @click="open = true">+ Add & give access</button>
   </div>
 
-  <div v-if="pendingDocs.length" class="card assign-banner">
+  <div v-if="pendingDocs.length && can('doctors.grant')" class="card assign-banner">
     <div>
       <b class="serif" style="font-size: 20px">{{ pendingDocs.length }} doctor(s) waiting for access</b>
       <p class="note">They can’t log in or receive bookings until access is granted.</p>
@@ -71,7 +72,7 @@ function save() {
           <td>{{ r.branch }}</td>
           <td>{{ r.phone }}</td>
           <td>
-            <select v-if="r.doctor && r.doctor.access === 'active'" v-model="r.doctor.status" style="width: 130px">
+            <select v-if="r.doctor && r.doctor.access === 'active'" v-model="r.doctor.status" :disabled="!can('doctors.grant')" style="width: 130px">
               <option>Available</option><option>In surgery</option><option>Off today</option>
             </select>
             <span v-else-if="r.doctor" class="badge" :class="r.doctor.access === 'banned' ? 'declined' : 'pending'">{{ r.doctor.access === 'banned' ? 'banned' : 'no access yet' }}</span>
@@ -79,9 +80,9 @@ function save() {
           </td>
           <td class="row">
             <template v-if="r.doctor">
-              <button v-if="r.doctor.access === 'pending'" class="btn gold sm" @click="actions.setDoctorAccess(r.doctor, 'active')">Grant access</button>
-              <button v-else-if="r.doctor.access === 'active' && can.ban(me)" class="btn danger sm" @click="actions.setDoctorAccess(r.doctor, 'banned')">Ban</button>
-              <button v-else-if="r.doctor.access === 'banned' && can.ban(me)" class="btn ghost sm" @click="actions.setDoctorAccess(r.doctor, 'active')">Reinstate</button>
+              <button v-if="r.doctor.access === 'pending' && can('doctors.grant')" class="btn gold sm" @click="actions.setDoctorAccess(r.doctor, 'active')">Grant access</button>
+              <button v-else-if="r.doctor.access === 'active' && can('doctors.ban')" class="btn danger sm" @click="actions.setDoctorAccess(r.doctor, 'banned')">Ban</button>
+              <button v-else-if="r.doctor.access === 'banned' && can('doctors.ban')" class="btn ghost sm" @click="actions.setDoctorAccess(r.doctor, 'active')">Reinstate</button>
             </template>
             <button v-else-if="canToggle(r.member)" class="btn sm" :class="r.member.status === 'active' ? 'danger' : 'ghost'" @click="actions.toggleStaff(r.member)">
               {{ r.member.status === 'active' ? 'Suspend' : 'Give access' }}

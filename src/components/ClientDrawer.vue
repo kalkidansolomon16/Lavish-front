@@ -13,7 +13,7 @@ const rxs = computed(() => state.prescriptions.filter((r) => r.clientId === ui.d
 const prescribe = () => { const id = ui.drawerClient; ui.drawerClient = null; router.push({ path: '/prescriptions', query: { client: id } }) }
 const chat = () => { ui.drawerClient = null; router.push('/chat') }
 const role = state.user.role
-const editable = can.editHistory(role)
+const editable = can('clients.history')
 const FIELDS = [['concern', 'Main concern'], ['skinType', 'Skin type'], ['allergies', 'Allergies'], ['medications', 'Medications'], ['conditions', 'Medical conditions'], ['previous', 'Previous treatments'], ['pregnant', 'Pregnant / breastfeeding']]
 const startHistory = () => (c.value.history = { source: 'Walk-in', concern: '', skinType: 'Normal', allergies: '', medications: '', conditions: '', previous: '', pregnant: 'No', recordedBy: state.user.name, date: new Date().toISOString().slice(0, 10) })
 </script>
@@ -32,7 +32,7 @@ const startHistory = () => (c.value.history = { source: 'Walk-in', concern: '', 
         </div>
         <div class="grid g4" style="grid-template-columns: 1fr 1fr; margin: 14px 0">
           <div class="card stat"><div class="n">{{ mine(state.appointments).length }}</div><div class="l">Visits</div></div>
-          <div v-if="can.seeRevenue(role)" class="card stat gold"><div class="n" style="font-size: 26px">{{ etb(spent) }}</div><div class="l">Lifetime spend</div></div>
+          <div v-if="can('finance.revenue')" class="card stat gold"><div class="n" style="font-size: 26px">{{ etb(spent) }}</div><div class="l">Lifetime spend</div></div>
           <div v-else class="card stat gold"><div class="n" style="font-size: 26px">{{ c.app ? 'Yes' : 'No' }}</div><div class="l">On the mobile app</div></div>
         </div>
 
@@ -55,23 +55,23 @@ const startHistory = () => (c.value.history = { source: 'Walk-in', concern: '', 
           <li v-if="!mine(state.appointments).length"><small>No visits yet</small></li>
         </ul>
 
-        <h3 v-if="can.seeRevenue(role)">Orders & payments</h3>
-        <ul v-if="can.seeRevenue(role)" class="timeline">
+        <h3 v-if="can('finance.revenue')">Orders & payments</h3>
+        <ul v-if="can('finance.revenue')" class="timeline">
           <li v-for="p in mine(state.payments)" :key="'p' + p.id"><b>{{ p.ref }} — {{ etb(p.amount) }}</b><small>{{ p.method }} · {{ p.status }}</small></li>
           <li v-for="o in mine(state.orders)" :key="'o' + o.id"><b>Order #{{ o.id }} — {{ etb(o.total) }}</b><small>{{ o.status }}</small></li>
         </ul>
 
         <h3>Prescriptions</h3>
         <ul class="timeline">
-          <li v-for="r in rxs" :key="r.id"><b>{{ r.items.length }} product(s) — {{ r.status }}</b><small>{{ r.date }} · {{ doctorName(r.doctorId) }}</small></li>
+          <li v-for="r in rxs" :key="r.id"><b>{{ r.items.length }} item(s) — {{ r.status }}</b><small>{{ r.date }} · {{ doctorName(r.doctorId) }}</small></li>
           <li v-if="!rxs.length"><small>None yet</small></li>
         </ul>
 
         <h3>Private notes</h3>
         <textarea v-model="c.note" rows="3" placeholder="Allergies, preferences, follow-up reminders…"></textarea>
         <div class="row" style="margin-top: 14px">
-          <button v-if="state.user.role === 'doctor'" class="btn gold" @click="prescribe">+ Prescribe</button>
-          <button v-if="state.user.role === 'doctor' && c.treated" class="btn ghost" @click="chat">Open chat</button>
+          <button v-if="can('prescriptions.create')" class="btn gold" @click="prescribe">+ Prescribe</button>
+          <button v-if="can('page.chat') && c.treated" class="btn ghost" @click="chat">Open chat</button>
           <button class="btn ghost" @click="ui.drawerClient = null">Close</button>
         </div>
       </aside>

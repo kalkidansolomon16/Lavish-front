@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { state, NAV } from '../store'
+import { state, nav } from '../store'
 import { ui, t } from '../ui'
 
 const router = useRouter()
@@ -10,7 +10,7 @@ const input = ref(null)
 const idx = ref(0)
 
 const all = computed(() => [
-  ...NAV[state.user.role].map((n) => ({ kind: 'Page', label: t(n), run: () => router.push('/' + n) })),
+  ...nav().map((n) => ({ kind: 'Page', label: t(n), run: () => router.push('/' + n) })),
   ...state.clients.map((c) => ({ kind: 'Client', label: c.name, sub: c.phone, run: () => (ui.drawerClient = c.id) })),
   ...state.doctors.map((d) => ({ kind: 'Doctor', label: d.name, sub: d.specialty, run: () => router.push('/staff').catch(() => {}) })),
   ...state.products.map((p) => ({ kind: 'Product', label: p.name, sub: p.category, run: () => router.push('/products').catch(() => {}) })),
