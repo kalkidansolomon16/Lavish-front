@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { state, doctorName, etb, can } from '../store'
+import { state, doctorName, etb, can, ORDER_FLOW } from '../store'
 import { ui } from '../ui'
 
 const router = useRouter()
@@ -58,7 +58,7 @@ const startHistory = () => (c.value.history = { source: 'Walk-in', concern: '', 
         <h3 v-if="can('finance.revenue')">Orders & payments</h3>
         <ul v-if="can('finance.revenue')" class="timeline">
           <li v-for="p in mine(state.payments)" :key="'p' + p.id"><b>{{ p.ref }} — {{ etb(p.amount) }}</b><small>{{ p.method }} · {{ p.status }}</small></li>
-          <li v-for="o in mine(state.orders)" :key="'o' + o.id"><b>Order #{{ o.id }} — {{ etb(o.total) }}</b><small>{{ o.status }}</small></li>
+          <li v-for="o in mine(state.orders)" :key="'o' + o.id"><b>Order #{{ o.id }} — {{ etb(o.total) }}</b><small>{{ ORDER_FLOW.find((s) => s.key === o.status)?.label ?? o.status }}</small></li>
         </ul>
 
         <h3>Prescriptions</h3>

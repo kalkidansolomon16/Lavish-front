@@ -1,6 +1,6 @@
 // Prototype-only UI state: language, notifications, simulated live events, CSV export.
 import { reactive } from 'vue'
-import { state, notify, clientName, doctorName } from './store'
+import { state, notify, clientName, doctorName, stampOrder } from './store'
 
 const day = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10)
 
@@ -68,7 +68,10 @@ export function startLive() {
       return ['Saron Mekonnen booked Signature HydraFacial with Dr. Yonas', ['reception', 'ceo'], '/appointments']
     }],
     [32000, () => {
-      state.orders.unshift({ id: 9004, clientId: 6, items: 'SPF 50 Mineral Sunscreen ×1', total: 1900, address: 'Kazanchis, Addis Ababa', lines: [{ productId: 3, qty: 1 }], status: 'placed', date: day(0) })
+      const o = { id: 9004, clientId: 6, items: 'SPF 50 Mineral Sunscreen ×1', total: 1900, address: 'Kazanchis, Addis Ababa', lines: [{ productId: 3, qty: 1 }], date: day(0), payment: 'unpaid', method: 'Pay on delivery' }
+      stampOrder(o, 'placed', 'just now')
+      o.history[0].by = 'Mobile app'
+      state.orders.unshift(o)
       return ['New order #9004 from Betty Yilma', ['ceo', 'ecommerce'], '/orders']
     }],
     [50000, () => {

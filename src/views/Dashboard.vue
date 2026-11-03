@@ -20,7 +20,7 @@ const stats = computed(() => {
     ceo: [
       ['Revenue this week', etb(revenue), true],
       ['Pending appointments', count(s.appointments, (a) => a.status === 'pending')],
-      ['Orders to deliver', count(s.orders, (o) => o.status === 'placed')],
+      ['Orders in progress', count(s.orders, (o) => !['delivered', 'cancelled'].includes(o.status))],
       ['Open complaints', count(s.complaints, (c) => c.status !== 'resolved')],
     ],
     gm: [
@@ -36,7 +36,7 @@ const stats = computed(() => {
       ['Not on the app yet', count(s.clients, (c) => !c.app)],
     ],
     ecommerce: [
-      ['Orders to deliver', count(s.orders, (o) => o.status === 'placed'), true],
+      ['Orders in progress', count(s.orders, (o) => !['delivered', 'cancelled'].includes(o.status)), true],
       ['Unpaid orders', count(s.orders, (o) => o.payment !== 'paid')],
       ['Low stock', count(s.products, (p) => p.stock > 0 && p.stock <= p.reorder)],
       ['Out of stock', count(s.products, (p) => p.stock === 0)],

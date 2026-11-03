@@ -85,15 +85,15 @@ export const state = reactive({
   ],
 
   clients: [
-    { id: 1, name: 'Tigist Worku', phone: '+251 911 22 33 44', joined: '2026-08-14', treated: true, doctorId: 1, lastTreatment: 'Signature HydraFacial', app: true,
+    { id: 1, name: 'Tigist Worku', phone: '+251 911 22 33 44', email: 'tigist.w@gmail.com', joined: '2026-08-14', treated: true, doctorId: 1, lastTreatment: 'Signature HydraFacial', app: true,
       history: { source: 'Walk-in', concern: 'Dull, dehydrated skin before a wedding', skinType: 'Dry', allergies: 'None known', medications: 'None', conditions: 'None', previous: 'No previous aesthetic treatments', pregnant: 'No', recordedBy: 'Hana Tadesse', date: '2026-08-14' } },
-    { id: 2, name: 'Rahel Assefa', phone: '+251 922 11 55 66', joined: '2026-09-02', treated: true, doctorId: 1, lastTreatment: 'PRP Skin Rejuvenation', app: true },
-    { id: 3, name: 'Mulu Desta', phone: '+251 933 44 77 88', joined: '2026-10-11', treated: false, doctorId: 2, lastTreatment: '—', app: true },
-    { id: 4, name: 'Frehiwot Kebede', phone: '+251 944 90 12 34', joined: '2026-10-20', treated: true, doctorId: 2, lastTreatment: 'Botox & Dermal Fillers', app: true,
+    { id: 2, name: 'Rahel Assefa', phone: '+251 922 11 55 66', email: 'rahel.assefa@gmail.com', joined: '2026-09-02', treated: true, doctorId: 1, lastTreatment: 'PRP Skin Rejuvenation', app: true },
+    { id: 3, name: 'Mulu Desta', phone: '+251 933 44 77 88', email: 'mulu.desta@yahoo.com', joined: '2026-10-11', treated: false, doctorId: 2, lastTreatment: '—', app: true },
+    { id: 4, name: 'Frehiwot Kebede', phone: '+251 944 90 12 34', email: 'frehiwot.k@gmail.com', joined: '2026-10-20', treated: true, doctorId: 2, lastTreatment: 'Botox & Dermal Fillers', app: true,
       history: { source: 'Phone call', concern: 'Fine lines around the eyes and forehead', skinType: 'Combination', allergies: 'Lidocaine (mild)', medications: 'None', conditions: 'None', previous: 'Botox 2025 (another clinic)', pregnant: 'No', recordedBy: 'Hana Tadesse', date: '2026-10-20' } },
-    { id: 5, name: 'Saron Mekonnen', phone: '+251 955 67 89 01', joined: '2026-10-28', treated: false, doctorId: 3, lastTreatment: '—', app: true },
-    { id: 6, name: 'Betty Yilma', phone: '+251 966 23 45 67', joined: '2026-07-30', treated: true, doctorId: 1, lastTreatment: 'Morpheus8 & Microneedling', app: true },
-    { id: 7, name: 'Almaz Tesfaye', phone: '+251 977 31 45 90', joined: today, treated: false, doctorId: 1, lastTreatment: '—', app: false,
+    { id: 5, name: 'Saron Mekonnen', phone: '+251 955 67 89 01', email: 'saron.mekonnen@gmail.com', joined: '2026-10-28', treated: false, doctorId: 3, lastTreatment: '—', app: true },
+    { id: 6, name: 'Betty Yilma', phone: '+251 966 23 45 67', email: 'betty.yilma@outlook.com', joined: '2026-07-30', treated: true, doctorId: 1, lastTreatment: 'Morpheus8 & Microneedling', app: true },
+    { id: 7, name: 'Almaz Tesfaye', phone: '+251 977 31 45 90', email: 'almaz.tesfaye@gmail.com', joined: today, treated: false, doctorId: 1, lastTreatment: '—', app: false,
       history: { source: 'Walk-in', concern: 'Dark spots on cheeks (melasma)', skinType: 'Oily', allergies: 'Penicillin', medications: 'Oral contraceptives', conditions: 'None', previous: 'Chemical peel 2024', pregnant: 'No', recordedBy: 'Hana Tadesse', date: today } },
   ],
 
@@ -127,8 +127,8 @@ export const state = reactive({
 
   orders: [
     { id: 9001, clientId: 1, items: 'Vitamin C Brightening Serum ×1, SPF 50 ×2', total: 6600, address: 'Bole, Addis Ababa', lines: [{ productId: 1, qty: 1 }, { productId: 3, qty: 2 }], status: 'placed', date: today, payment: 'unpaid', method: 'Pay on delivery' },
-    { id: 9002, clientId: 4, items: 'Post-Treatment Recovery Balm ×1', total: 2400, address: 'CMC, Addis Ababa', lines: [{ productId: 4, qty: 1 }], status: 'placed', date: today, payment: 'paid', method: 'Telebirr' },
-    { id: 9003, clientId: 2, items: 'Hyaluronic Hydra Cream ×2', total: 6400, address: 'Piassa, Addis Ababa', lines: [{ productId: 2, qty: 2 }], status: 'delivered', date: day(-2), payment: 'paid', method: 'Chapa · CBE Birr', notified: true },
+    { id: 9002, clientId: 4, items: 'Post-Treatment Recovery Balm ×1', total: 2400, address: 'CMC, Addis Ababa', lines: [{ productId: 4, qty: 1 }], status: 'preparing', date: today, payment: 'paid', method: 'Telebirr' },
+    { id: 9003, clientId: 2, items: 'Hyaluronic Hydra Cream ×2', total: 6400, address: 'Piassa, Addis Ababa', lines: [{ productId: 2, qty: 2 }], status: 'delivered', date: day(-2), payment: 'paid', method: 'Chapa · CBE Birr', notified: true, courier: { name: 'Yared Bekele', phone: '+251 922 33 44 55' } },
   ],
 
   complaints: [
@@ -332,8 +332,56 @@ export function logout() {
 }
 
 // Units promised to placed (not yet delivered) orders.
+// ---- order tracking ----
+// Every step is stamped in the order's history and emailed to the client (and shown in the app).
+export const ORDER_FLOW = [
+  { key: 'placed', label: 'New order', client: 'Order placed', icon: '🛍', next: null },
+  { key: 'confirmed', label: 'Confirmed', client: 'Order confirmed', icon: '✓', next: 'Confirm order' },
+  { key: 'preparing', label: 'Preparing', client: 'Your order is being prepared', icon: '📦', next: 'Start preparing' },
+  { key: 'ready', label: 'Ready to deliver', client: 'Ready for delivery', icon: '🏷', next: 'Mark ready to deliver' },
+  { key: 'out', label: 'Out for delivery', client: 'Out for delivery', icon: '🚚', next: 'Hand to courier' },
+  { key: 'delivered', label: 'Delivered', client: 'Delivered', icon: '🏠', next: 'Confirm delivery' },
+]
+export const flowIndex = (status) => ORDER_FLOW.findIndex((s) => s.key === status)
+export const nextStep = (o) => (o.status === 'cancelled' ? null : ORDER_FLOW[flowIndex(o.status) + 1] ?? null)
+export const orderOpen = (o) => !['delivered', 'cancelled'].includes(o.status)
+export const trackingCode = (o) => 'LV-' + o.id
+const stamp = () => new Date().toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+
+function orderEmail(o, status, note) {
+  const c = state.clients.find((x) => x.id === o.clientId)
+  const first = c?.name.split(' ')[0] ?? 'there'
+  const n = '#' + o.id
+  const T = {
+    placed: [`We received your order ${n}`, `Thank you for shopping with Lavish. We’ve received your order (${o.items}) — total ${etb(o.total)}. We’ll email you again as soon as it’s confirmed.`],
+    confirmed: [`Your order ${n} is confirmed`, 'Good news — your order is confirmed. Our team will start preparing your products shortly.'],
+    preparing: [`Your order ${n} is being prepared`, 'We’re carefully preparing and packing your products right now.'],
+    ready: [`Your order ${n} is ready for delivery`, `Your order is packed and waiting for the courier. It will be delivered to: ${o.address}.`],
+    out: [`Your order ${n} is out for delivery`, `Your order is on its way with ${o.courier?.name ?? 'our courier'}${o.courier?.phone ? ' (' + o.courier.phone + ')' : ''}. Please keep your phone nearby.${o.method === 'Pay on delivery' ? ` Please have ${etb(o.total)} ready to pay on delivery.` : ''}`],
+    delivered: [`Your order ${n} was delivered`, 'Your order has been delivered. Enjoy your products — and tell us how you like them in the app!'],
+    cancelled: [`Your order ${n} was cancelled`, `Your order has been cancelled${note ? ': ' + note : '.'} If you already paid, our team will contact you about your refund.`],
+  }
+  const [subject, body] = T[status]
+  return { to: c?.email ?? '—', subject, body: `Hi ${first},\n\n${body}\n\nTrack your order any time in the Lavish app → Profile → My orders (tracking code ${trackingCode(o)}).\n\nWith care,\nLavish Medical Spa`, at: '' }
+}
+// Records a status change: history entry + email to the client.
+export function stampOrder(o, status, at = stamp(), note) {
+  o.status = status
+  ;(o.history ??= []).push({ status, at, by: state.user?.name ?? 'Mobile app', note })
+  ;(o.emails ??= []).push({ ...orderEmail(o, status, note), at })
+  o.notified = true
+}
+
+// Demo orders get a believable trail of status changes + emails.
+state.orders.forEach((o) => {
+  if (o.history) return
+  ORDER_FLOW.slice(0, flowIndex(o.status) + 1).forEach((st, i) =>
+    stampOrder(o, st.key, `${o.date.slice(8)}/${o.date.slice(5, 7)} ${String(8 + i).padStart(2, '0')}:${i % 2 ? '40' : '05'}`))
+  o.history.forEach((h, i) => (h.by = i ? 'Abel Girma' : 'Mobile app'))
+})
+
 export const reserved = (productId) =>
-  state.orders.filter((o) => o.status === 'placed')
+  state.orders.filter((o) => orderOpen(o))
     .reduce((t, o) => t + (o.lines ?? []).filter((l) => l.productId === productId).reduce((n, l) => n + l.qty, 0), 0)
 
 function logMove(p, type, qty, reason, ref) {
@@ -390,17 +438,38 @@ export const actions = {
     notify(`${p.name} adjusted to ${counted}`)
   },
   deleteProduct(p) { state.products = state.products.filter((x) => x !== p); notify('Product removed') },
-  // Deducts stock for each line. Returns the products that fell to/below their reorder level, or null if blocked.
-  confirmDelivery(o) {
+  // Moves an order one step along ORDER_FLOW and emails the client.
+  // Stock is checked when confirming and deducted on delivery. Returns products now at/below reorder level.
+  advanceOrder(o, { courier } = {}) {
+    const step = nextStep(o)
+    if (!step) return []
     const lines = (o.lines ?? []).map((l) => ({ p: state.products.find((x) => x.id === l.productId), qty: l.qty }))
     const short = lines.find((l) => l.p.stock < l.qty)
-    if (short) { notify(`Not enough stock for ${short.p.name} — restock first`); return null }
+    if (short && ['confirmed', 'delivered'].includes(step.key)) { notify(`Not enough stock for ${short.p.name} — restock first`); return null }
+    if (step.key === 'out') {
+      if (!courier?.name) { notify('Add the courier’s name first'); return null }
+      o.courier = courier
+    }
     const low = []
-    lines.forEach((l) => { l.p.stock -= l.qty; takeFromBranches(l.p, l.qty); logMove(l.p, 'sold', -l.qty, 'Order delivered', '#' + o.id); if (l.p.stock <= l.p.reorder) low.push(l.p) })
-    o.status = 'delivered'; o.notified = true
-    if (o.method === 'Pay on delivery') o.payment = 'paid'
-    notify(`Order #${o.id} delivered — client notified in the app`)
+    if (step.key === 'delivered') {
+      lines.forEach((l) => { l.p.stock -= l.qty; takeFromBranches(l.p, l.qty); logMove(l.p, 'sold', -l.qty, 'Order delivered', '#' + o.id); if (l.p.stock <= l.p.reorder) low.push(l.p) })
+      if (o.method === 'Pay on delivery') o.payment = 'paid'
+    }
+    stampOrder(o, step.key)
+    const c = state.clients.find((x) => x.id === o.clientId)
+    notify(`Order #${o.id}: ${step.label} — email sent to ${c?.email ?? 'the client'} and the app updated`)
     return low
+  },
+  cancelOrder(o, reason) {
+    if (!orderOpen(o)) return
+    stampOrder(o, 'cancelled', undefined, reason)
+    notify(`Order #${o.id} cancelled — client emailed`)
+  },
+  resendOrderEmail(o) {
+    const last = o.emails?.at(-1)
+    if (!last) return
+    o.emails.push({ ...last, at: stamp(), resent: true })
+    notify(`Email re-sent to ${last.to}`)
   },
   updateComplaint(c, status) { c.status = status; notify(`Complaint ${status}`) },
   addPrescription(rx) {
@@ -420,10 +489,12 @@ export const actions = {
     const items = rx.items.filter((i) => i.productId)
     if (!items.length) return notify('Nothing to order — all items are outside Lavish products')
     const lines = items.map((i) => ({ p: state.products.find((x) => x.id === i.productId), qty: i.qty }))
-    state.orders.unshift({
-      id: Date.now() % 100000, clientId: rx.clientId, date: today, status: 'placed', address: 'To be confirmed with client', lines: items.map((i) => ({ productId: i.productId, qty: i.qty })),
-      items: lines.map((l) => `${l.p.name} ×${l.qty}`).join(', '), total: lines.reduce((t, l) => t + l.p.price * l.qty, 0),
-    })
+    const o = {
+      id: Date.now() % 100000, clientId: rx.clientId, date: today, address: 'To be confirmed with client', lines: items.map((i) => ({ productId: i.productId, qty: i.qty })),
+      items: lines.map((l) => `${l.p.name} ×${l.qty}`).join(', '), total: lines.reduce((t, l) => t + l.p.price * l.qty, 0), payment: 'unpaid', method: 'Pay on delivery',
+    }
+    stampOrder(o, 'placed')
+    state.orders.unshift(o)
     rx.status = 'ordered'
     notify('Order created from prescription — stock reserved')
   },
@@ -539,7 +610,7 @@ const ACTION_PERMS = {
   markPaid: 'payments.collect',
   addProduct: 'products.edit', receiveStock: 'products.edit', setPrice: 'products.edit', adjustStock: 'products.edit', deleteProduct: 'products.edit',
   transferStock: 'products.transfer',
-  confirmDelivery: 'orders.deliver', markOrderPaid: 'orders.deliver',
+  advanceOrder: 'orders.deliver', cancelOrder: 'orders.deliver', resendOrderEmail: 'orders.deliver', markOrderPaid: 'orders.deliver',
   updateComplaint: 'complaints.manage',
   addPrescription: 'prescriptions.create', suggestRestocked: 'prescriptions.create',
   fulfillPrescription: 'prescriptions.fulfil',

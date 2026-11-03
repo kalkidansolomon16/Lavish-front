@@ -37,7 +37,7 @@ export const PERMISSIONS = [
   { group: 'Products & orders', items: [
     { key: 'products.edit', label: 'Add products, set prices, receive & adjust stock' },
     { key: 'products.transfer', label: 'Transfer stock between branches' },
-    { key: 'orders.deliver', label: 'Confirm deliveries & mark orders paid' },
+    { key: 'orders.deliver', label: 'Update order status (confirm → prepare → deliver), cancel & mark paid' },
   ] },
   { group: 'Prescriptions', items: [
     { key: 'prescriptions.create', label: 'Write prescriptions & suggest restocked products', only: ['doctor'] },
