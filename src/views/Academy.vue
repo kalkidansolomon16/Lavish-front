@@ -42,7 +42,7 @@ const smsCreds = () => { actions.smsStudentLogin(creds.value); creds.value = nul
 <template>
   <div class="head">
     <div>
-      <h1>Academy Teacher</h1>
+      <h1>Lavish Academy</h1>
       <p>Control learning paths, give teacher doctors access, enrol students and issue certificates. Teachers manage lessons in their own portal.</p>
     </div>
     <button v-if="canAdd" class="btn gold" @click="adding = true">+ Add student</button>

@@ -23,7 +23,7 @@ function why(r, k) {
     <div>
       <h1>Permissions</h1>
       <p>Choose what each portal can see and do. You can only change roles below you
-        (CEO → General Manager → Reception, E-commerce, Doctor, Academy Teacher), and only grant permissions you hold yourself.
+        (CEO → General Manager → Reception, E-commerce, Doctor, Lavish Academy), and only grant permissions you hold yourself.
         Changes apply the next time that person opens a page.</p>
     </div>
     <button v-if="editable.length" class="btn ghost" @click="resetPerms">Reset to defaults</button>

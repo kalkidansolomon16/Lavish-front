@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { state, doctorName, courseTitle, etb, can, BRANCHES } from '../store'
+import { state, doctorName, courseTitle, etb, can, BRANCHES, meKey, personName } from '../store'
 import { ui, t } from '../ui'
 import BarChart from '../components/BarChart.vue'
 import Donut from '../components/Donut.vue'
@@ -79,9 +79,18 @@ const lowStock = computed(() => state.products.filter((p) => p.stock <= p.reorde
 const classes = computed(() => state.sessions.filter((x) => x.teacherId === myDoc).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)))
 const feed = computed(() => ui.notifications.filter((n) => n.roles.includes(role)).slice(0, 5))
 const hasAppts = ['ceo', 'reception', 'doctor'].includes(role)
+// Newest unread staff announcement for me, from Lavish Team.
+const me = meKey()
+const latestAnn = computed(() => can('page.team') && state.announcements.find((a) => !a.readBy.includes(me) &&
+  (a.audience === 'all' || state.groups.find((g) => g.id === a.audience)?.members.includes(me))))
 </script>
 
 <template>
+  <RouterLink v-if="latestAnn" to="/team" class="card ann-banner">
+    <span class="ic">📣</span>
+    <span><b>{{ latestAnn.title }}</b><small>{{ personName(latestAnn.by) }} · {{ latestAnn.date }} — open Lavish Team to read</small></span>
+  </RouterLink>
+
   <div class="head">
     <div>
       <h1>{{ t('welcome') }}, {{ state.user.name }}</h1>

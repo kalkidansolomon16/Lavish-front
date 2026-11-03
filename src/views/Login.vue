@@ -1,11 +1,9 @@
 <script setup>
 import { useRouter } from 'vue-router'
-import { ROLES, login } from '../store'
-import { ui } from '../ui'
-import BarChart from '../components/BarChart.vue'
+import { ROLES, login, nav } from '../store'
 
 const router = useRouter()
-const enter = (r) => { login(r); router.push('/dashboard') }
+const enter = (r) => { login(r); router.push('/' + nav()[0]) }
 </script>
 
 <template>
@@ -14,35 +12,35 @@ const enter = (r) => { login(r); router.push('/dashboard') }
       <div class="hero-copy">
         <span class="eyebrow">LAVISH STAFF PORTAL</span>
         <h2>Ultra Luxury in Science and Beauty.</h2>
-        <p>Six portals — CEO, General Manager, Reception, E-commerce, Doctors and Academy Teacher — connected to the Lavish mobile app.</p>
+        <p>One home for the Lavish team — caring for every client, shaping new careers and growing a brand built on trust.</p>
       </div>
 
-      <div class="floaters">
-        <div class="glass f1">
-          <div class="g-title">Weekly revenue <small>ETB</small></div>
-          <BarChart :data="ui.revenue" money />
+      <div class="showcase">
+        <div class="motto">
+          <q>Where medical science meets the art of beauty.</q>
+          <small>THE LAVISH PROMISE</small>
         </div>
 
-        <div class="glass f2">
-          <span class="dot ok">✓</span>
-          <div><b>Appointment approved</b><small>Dr. Meron Alemu was notified instantly</small></div>
+        <div class="pillars">
+          <div class="pillar">
+            <div class="ic">✚</div>
+            <b>Science-led care</b>
+            <span>Every treatment is planned and performed by licensed doctors, guided by evidence.</span>
+          </div>
+          <div class="pillar">
+            <div class="ic">✦</div>
+            <b>Ultra-luxury experience</b>
+            <span>Calm, private spaces and personal attention from the first hello to the last follow-up.</span>
+          </div>
+          <div class="pillar">
+            <div class="ic">❦</div>
+            <b>Academy of excellence</b>
+            <span>Training the next generation of aesthetic professionals with hands-on mastery.</span>
+          </div>
         </div>
 
-        <div class="glass f3">
-          <div class="g-title">Client chat</div>
-          <div class="mini-bubble">Hi Doctor, is mild dryness normal after the facial?</div>
-          <div class="mini-bubble me">Yes — use the Hydra Cream twice daily. 🌿</div>
-        </div>
-
-        <div class="glass f4">
-          <div class="pill"><b>3</b><small>pending approvals</small></div>
-          <div class="pill"><b>2</b><small>orders to deliver</small></div>
-          <div class="pill"><b>5</b><small>academy students</small></div>
-        </div>
-
-        <div class="glass f5">
-          <span class="dot">🔔</span>
-          <div><b>New complaint received</b><small>General Manager has been alerted</small></div>
+        <div class="promise">
+          <span>Addis Ababa · Bole</span><i></i><span>Addis Ababa · Kazanchis</span><i></i><span>Hawassa</span>
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@
 // When the backend exists, these become Laravel policies / a role_permissions table.
 
 // Lower number = higher in the hierarchy. A role can only manage roles below it.
-export const LEVEL = { ceo: 1, gm: 2, reception: 3, ecommerce: 3, doctor: 3, teacher: 3 }
+export const LEVEL = { ceo: 1, gm: 2, reception: 3, ecommerce: 3, doctor: 3, teacher: 3, team: 3 }
 
 // `only` = the permission makes sense for these roles only (personal pages / clinical actions).
 export const PERMISSIONS = [
@@ -18,6 +18,7 @@ export const PERMISSIONS = [
     { key: 'page.staff', label: 'Staff' },
     { key: 'page.news', label: 'News' },
     { key: 'page.permissions', label: 'Permissions' },
+    { key: 'page.team', label: 'Lavish Team (announcements, groups & staff chat)' },
     { key: 'page.chat', label: 'Patient chat', only: ['doctor'] },
     { key: 'page.schedule', label: 'Class schedule', only: ['teacher'] },
     { key: 'page.modules', label: 'Modules', only: ['teacher'] },
@@ -59,6 +60,10 @@ export const PERMISSIONS = [
     { key: 'doctors.ban', label: 'Ban & reinstate doctors' },
     { key: 'permissions.manage', label: 'Change permissions of lower roles' },
   ] },
+  { group: 'Lavish Team', items: [
+    { key: 'team.announce', label: 'Send announcements to all staff or a group' },
+    { key: 'team.groups', label: 'Create staff groups & manage their members' },
+  ] },
 ]
 
 export const ALL_KEYS = PERMISSIONS.flatMap((g) => g.items.map((i) => i.key))
@@ -71,15 +76,17 @@ export const applies = (key, role) => {
 // The CEO always has every permission that applies to them; that row can't be edited.
 export const DEFAULT_PERMS = {
   ceo: ALL_KEYS.filter((k) => applies(k, 'ceo')),
-  gm: ['page.complaints', 'page.products', 'page.staff', 'page.academy', 'page.news', 'page.permissions',
+  gm: ['page.complaints', 'page.products', 'page.staff', 'page.academy', 'page.news', 'page.permissions', 'page.team', 'team.announce', 'team.groups',
     'products.transfer', 'complaints.manage', 'news.publish', 'academy.paths', 'academy.certificates',
     'staff.add', 'doctors.grant', 'permissions.manage'],
-  reception: ['page.appointments', 'page.clients', 'page.payments',
+  reception: ['page.appointments', 'page.clients', 'page.payments', 'page.team',
     'appointments.approve', 'clients.history', 'clients.invite', 'finance.revenue', 'payments.collect'],
-  ecommerce: ['page.products', 'page.orders', 'page.prescriptions', 'products.edit', 'orders.deliver', 'prescriptions.fulfil'],
-  doctor: ['page.appointments', 'page.clients', 'page.prescriptions', 'page.chat', 'appointments.complete', 'prescriptions.create'],
-  teacher: ['page.schedule', 'page.modules', 'page.students', 'academy.teach'],
+  ecommerce: ['page.products', 'page.orders', 'page.prescriptions', 'page.team', 'products.edit', 'orders.deliver', 'prescriptions.fulfil'],
+  doctor: ['page.appointments', 'page.clients', 'page.prescriptions', 'page.chat', 'page.team', 'appointments.complete', 'prescriptions.create'],
+  teacher: ['page.schedule', 'page.modules', 'page.students', 'academy.teach', 'page.team'],
+  // Staff with no work portal (nurses, therapists, drivers…) — they only see the groups they're in.
+  team: ['page.team'],
 }
 
 // Sidebar order.
-export const PAGES = ['dashboard', 'appointments', 'payments', 'clients', 'chat', 'products', 'orders', 'prescriptions', 'complaints', 'academy', 'staff', 'news', 'schedule', 'modules', 'students', 'permissions']
+export const PAGES = ['dashboard', 'appointments', 'payments', 'clients', 'chat', 'products', 'orders', 'prescriptions', 'complaints', 'academy', 'staff', 'news', 'schedule', 'modules', 'students', 'team', 'permissions']

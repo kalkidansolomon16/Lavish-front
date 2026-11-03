@@ -34,11 +34,12 @@ export const ui = reactive({
 })
 
 const T = {
-  dashboard: 'ዳሽቦርድ', permissions: 'ፈቃዶች', appointments: 'ቀጠሮዎች', payments: 'ክፍያዎች', clients: 'ደንበኞች', chat: 'ውይይት',
+  dashboard: 'ዳሽቦርድ', permissions: 'ፈቃዶች', team: 'የላቪሽ ቡድን', appointments: 'ቀጠሮዎች', payments: 'ክፍያዎች', clients: 'ደንበኞች', chat: 'ውይይት',
   products: 'ምርቶች', orders: 'ትዕዛዞች', complaints: 'ቅሬታዎች', prescriptions: 'ማዘዣዎች', academy: 'አካዳሚ', staff: 'ሰራተኞች', news: 'ዜና', schedule: 'መርሃ ግብር', modules: 'ሞጁሎች', students: 'ተማሪዎች',
   welcome: 'እንኳን ደህና መጡ', upcoming: 'መጪ ቀጠሮዎች', revenue: 'የሳምንቱ ገቢ', mix: 'የሕክምና ዓይነቶች',
 }
-export const t = (k) => (ui.lang === 'am' && T[k]) || k
+const EN = { team: 'Lavish Team' }
+export const t = (k) => (ui.lang === 'am' && T[k]) || EN[k] || k
 
 export function pushNotif(text, roles, to, doctorId) {
   ui.notifications.unshift({ id: Date.now() + Math.random(), text, roles, to, doctorId, time: 'just now', read: false })

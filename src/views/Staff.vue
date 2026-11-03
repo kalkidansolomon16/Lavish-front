@@ -6,7 +6,7 @@ import { LEVEL } from '../permissions'
 const me = state.user.role
 const roleLabel = (r) => (r === 'doctor' ? 'Doctor' : ROLES[r].label)
 // You can only add people to roles below you in the hierarchy (the CEO can add a GM; the GM can't).
-const creatable = ['doctor', 'gm', 'reception', 'ecommerce'].filter((r) => LEVEL[r] > LEVEL[me])
+const creatable = ['doctor', 'gm', 'reception', 'ecommerce', 'team'].filter((r) => LEVEL[r] > LEVEL[me])
 const tab = ref('all')
 const open = ref(false)
 const blank = () => ({ name: '', role: 'doctor', position: '', branch: BRANCHES[0], phone: '' })
@@ -53,7 +53,7 @@ function save() {
   </div>
 
   <div class="tabs">
-    <button v-for="t in ['all', 'doctor', 'ceo', 'gm', 'reception', 'ecommerce']" :key="t" :class="{ on: tab === t }" @click="tab = t">
+    <button v-for="t in ['all', 'doctor', 'ceo', 'gm', 'reception', 'ecommerce', 'team']" :key="t" :class="{ on: tab === t }" @click="tab = t">
       {{ t === 'all' ? 'All' : roleLabel(t) }} · {{ count(t) }}
     </button>
   </div>
@@ -104,7 +104,7 @@ function save() {
       <label>Branch</label>
       <select v-model="form.branch"><option v-for="b in BRANCHES" :key="b">{{ b }}</option></select>
       <label>Phone</label><input v-model="form.phone" placeholder="+251 …" />
-      <p class="note" style="margin-top: 12px">A login invite is sent to this number. To make a doctor an Academy teacher, assign them to a course in Academy.</p>
+      <p class="note" style="margin-top: 12px">A login invite is sent to this number. “Lavish Team” is for staff without a work portal (nurses, therapists, drivers) — they only see their groups and messages. To make a doctor an Academy teacher, assign them to a course in Academy.</p>
       <div class="row" style="margin-top: 18px; justify-content: flex-end">
         <button type="button" class="btn ghost" @click="open = false">Cancel</button>
         <button class="btn gold">Add & send invite</button>

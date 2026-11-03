@@ -10,21 +10,23 @@ export const ROLES = {
   reception: { label: 'Receptionist', name: 'Hana Tadesse', blurb: 'Appointments, walk-in intake & payments' },
   ecommerce: { label: 'Lavish E-commerce', name: 'Abel Girma', blurb: 'Products & prices, inventory, deliveries & order payments' },
   doctor: { label: 'Doctor', name: 'Dr. Meron Alemu', blurb: 'Your patients, their history & prescriptions', doctorId: 1 },
-  teacher: { label: 'Academy Teacher', name: 'Dr. Meron Alemu', blurb: 'Your students, schedule, modules, videos & exercises', doctorId: 1 },
+  teacher: { label: 'Lavish Academy', name: 'Dr. Meron Alemu', blurb: 'Your students, schedule, modules, videos & exercises', doctorId: 1 },
+  team: { label: 'Lavish Team', name: 'Selam Getahun', blurb: 'Staff groups, announcements & team chat — for every member of staff', teamOnly: true },
 }
 
 // ---- permissions (see permissions.js) ----
 // Grants per role, editable in the Permissions page and saved in the browser for the demo.
-const savedPerms = JSON.parse(localStorage.getItem('lavish_perms') || 'null')
+const savedPerms = JSON.parse(localStorage.getItem('lavish_perms_v2') || 'null')
 const perms = reactive(savedPerms ?? structuredClone(DEFAULT_PERMS))
 perms.ceo = [...DEFAULT_PERMS.ceo] // the top of the hierarchy is never restricted
-const savePerms = () => localStorage.setItem('lavish_perms', JSON.stringify(perms))
+const savePerms = () => localStorage.setItem('lavish_perms_v2', JSON.stringify(perms))
 
 // Does `role` (default: the signed-in user) hold this permission?
 export const can = (key, role = state.user?.role) => !!role && perms[role]?.includes(key)
 
 // Pages in the sidebar — the dashboard is always there.
-export const nav = (role = state.user?.role) => PAGES.filter((p) => p === 'dashboard' || can('page.' + p, role))
+// Team-only members have no dashboard; they land straight in Lavish Team.
+export const nav = (role = state.user?.role) => PAGES.filter((p) => (p === 'dashboard' ? !ROLES[role]?.teamOnly : can('page.' + p, role)))
 
 // Hierarchy rule: you may change a role's permission only if that role is below you,
 // you can manage permissions, you hold the permission yourself, and it applies to that role.
@@ -77,6 +79,9 @@ export const state = reactive({
     { id: 4, name: 'Mekdes Tolera', role: 'reception', position: 'Front Desk', branch: 'Hawassa', phone: '+251 462 00 77 88', status: 'suspended' },
     { id: 5, name: 'Dawit Haile', role: 'gm', position: 'General Manager', branch: 'Addis Ababa – Bole', phone: '+251 911 00 99 00', status: 'active' },
     { id: 6, name: 'Abel Girma', role: 'ecommerce', position: 'E-commerce & Inventory', branch: 'Addis Ababa – Bole', phone: '+251 911 11 22 33', status: 'active' },
+    { id: 7, name: 'Selam Getahun', role: 'team', position: 'Nurse', branch: 'Addis Ababa – Bole', phone: '+251 911 44 55 66', status: 'active' },
+    { id: 8, name: 'Ruth Alemayehu', role: 'team', position: 'Skin Therapist', branch: 'Addis Ababa – Bole', phone: '+251 911 77 88 99', status: 'active' },
+    { id: 9, name: 'Yared Bekele', role: 'team', position: 'Delivery & Logistics', branch: 'Addis Ababa – Bole', phone: '+251 922 33 44 55', status: 'active' },
   ],
 
   clients: [
@@ -212,6 +217,26 @@ export const state = reactive({
       items: [{ productId: 5, qty: 1, instructions: 'Massage into scalp every evening', waiting: true }] },
   ],
 
+  // ---- Lavish Team: internal staff communication ----
+  // People are keyed 's<id>' (staff) or 'd<id>' (doctors). Groups are created by the CEO / GM.
+  announcements: [
+    { id: 1, title: 'Welcome to Lavish Team', body: 'This is our new space for staff news, groups and direct messages. Please check it at the start of every shift.', by: 's1', date: day(-2), audience: 'all', readBy: ['s1', 's5'] },
+    { id: 2, title: 'Bole team meeting — Friday 8:30', body: 'Short stand-up before opening: new HydraFacial booster protocol and weekend staffing.', by: 's5', date: day(-1), audience: 2, readBy: ['s5'] },
+  ],
+  groups: [
+    { id: 1, name: 'All Doctors', about: 'Clinical updates, protocols and case discussions', members: ['s1', 's5', 'd1', 'd2', 'd3', 'd4'], by: 's1', date: day(-20),
+      messages: [{ from: 's1', text: 'Please review the updated consent form before Monday.', time: 'Mon 09:10' }, { from: 'd2', text: 'Done — looks good.', time: 'Mon 10:02' }] },
+    { id: 2, name: 'Bole Front Desk & Care', about: 'Daily coordination at the Bole branch', members: ['s5', 's2', 's7', 's8', 'd1'], by: 's5', date: day(-10),
+      messages: [{ from: 's2', text: 'Morning! 3 walk-ins already booked for this afternoon.', time: '08:45' }, { from: 's7', text: 'Treatment room 2 is ready.', time: '08:52' }] },
+    { id: 3, name: 'Shop & Delivery', about: 'Orders, stock and deliveries', members: ['s1', 's6', 's9'], by: 's1', date: day(-6),
+      messages: [{ from: 's6', text: 'Order #9001 is packed and ready for pickup.', time: 'Yesterday' }] },
+  ],
+  // Direct messages, keyed by the two people's keys sorted and joined with '|'.
+  dms: {
+    's2|s7': [{ from: 's2', text: 'Can you prep room 1 for Tigist at 9?', time: '08:30' }, { from: 's7', text: 'On it 👍', time: '08:31' }],
+    'd1|s1': [{ from: 's1', text: 'Dr. Meron, great feedback from clients this week. Thank you!', time: 'Tue' }],
+  },
+
   chats: {
     1: [
       { from: 'client', text: 'Hi Doctor, my skin feels dry since the facial. Is that normal?', time: '09:12' },
@@ -222,6 +247,16 @@ export const state = reactive({
     6: [{ from: 'client', text: 'Thank you for today!', time: 'Mon' }],
   },
 })
+
+// Everyone with an active account, for groups and direct messages.
+export const people = () => [
+  ...state.staff.filter((m) => m.status === 'active').map((m) => ({ key: 's' + m.id, name: m.name, role: m.role, title: m.position })),
+  ...state.doctors.filter((d) => d.access === 'active').map((d) => ({ key: 'd' + d.id, name: d.name, role: 'doctor', title: d.specialty })),
+]
+export const personName = (key) => people().find((p) => p.key === key)?.name ?? 'Former staff'
+// The signed-in user's person key (doctor and academy portals are the same person).
+export const meKey = () => people().find((p) => p.name === state.user?.name)?.key
+export const dmKey = (a, b) => [a, b].sort().join('|')
 
 export const clientName = (id) => state.clients.find((c) => c.id === id)?.name ?? 'Unknown'
 export const doctorName = (id) => state.doctors.find((d) => d.id === id)?.name ?? 'Unassigned'
@@ -401,6 +436,31 @@ export const actions = {
     notify(`${m.name} added — login invite sent to ${m.phone}`)
   },
   toggleStaff(m) { m.status = m.status === 'active' ? 'suspended' : 'active'; notify(`${m.name} ${m.status === 'active' ? 'reactivated' : 'suspended'}`) },
+  // ---- Lavish Team ----
+  postAnnouncement({ title, body, audience }) {
+    state.announcements.unshift({ id: Date.now(), title, body, audience, by: meKey(), date: today, readBy: [meKey()] })
+    notify(audience === 'all' ? 'Announcement sent to all staff' : 'Announcement sent to the group')
+  },
+  deleteAnnouncement(a) { state.announcements = state.announcements.filter((x) => x !== a); notify('Announcement removed') },
+  createGroup({ name, about, members }) {
+    const g = { id: Date.now(), name, about, members: [...new Set([meKey(), ...members])], by: meKey(), date: today, messages: [] }
+    state.groups.unshift(g)
+    notify(`Group “${name}” created — ${g.members.length} members can now see it`)
+    return g
+  },
+  setGroupMembers(g, members) { g.members = [...new Set(members)]; notify('Group members updated') },
+  deleteGroup(g) { state.groups = state.groups.filter((x) => x !== g); notify('Group deleted') },
+  sendGroupMessage(g, text) {
+    // Members only (people who manage groups can also post).
+    if (!g.members.includes(meKey()) && !can('team.groups')) return notify('Only members of this group can post here')
+    g.messages.push({ from: meKey(), text, time: 'now' })
+  },
+  sendDirect(to, text) {
+    const k = dmKey(meKey(), to)
+    if (!state.dms[k]) state.dms[k] = []
+    state.dms[k].push({ from: meKey(), text, time: 'now' })
+  },
+
   sendChat(clientId, text) {
     state.chats[clientId].push({ from: 'doctor', text, time: 'now' })
   },
@@ -490,6 +550,9 @@ const ACTION_PERMS = {
   sendAppInvite: 'clients.invite', markRegistered: 'clients.invite',
   addNews: 'news.publish', toggleNews: 'news.publish', deleteNews: 'news.publish',
   addStudent: 'academy.students', resetStudentPassword: 'academy.students', smsStudentLogin: 'academy.students',
+  postAnnouncement: 'team.announce', deleteAnnouncement: 'team.announce',
+  createGroup: 'team.groups', setGroupMembers: 'team.groups', deleteGroup: 'team.groups',
+  sendGroupMessage: 'page.team', sendDirect: 'page.team',
   addModule: 'academy.paths', setTeachers: 'academy.paths',
   saveLesson: 'academy.teach', publishModule: 'academy.teach', addSession: 'academy.teach', setProgress: 'academy.teach', messageStudent: 'academy.teach',
   issueCertificate: 'academy.certificates',
