@@ -19,9 +19,9 @@ export const ui = reactive({
     { label: 'Today', value: 4500 },
   ],
   branches: [
-    { label: 'Addis – Bole', value: 86 },
-    { label: 'Addis – Kazanchis', value: 64 },
-    { label: 'Hawassa', value: 41 },
+    { label: 'Addis Ababa', value: 86 },
+    { label: 'Adama', value: 64 },
+    { label: 'Dire Dawa', value: 41 },
   ],
   notifications: [
     { id: 1, text: 'Frehiwot Kebede submitted a complaint about redness after filler', roles: ['gm', 'ceo'], time: '2h ago', read: false, to: '/complaints' },

@@ -42,7 +42,7 @@ function save() {
   <div v-if="open" class="modal-bg" @click.self="open = false">
     <form class="modal" @submit.prevent="save">
       <h2>Post news</h2>
-      <label>Title</label><input v-model="form.title" required placeholder="e.g. New treatment at Bole" />
+      <label>Title</label><input v-model="form.title" required placeholder="e.g. New treatment at Adama" />
       <label>Message</label><textarea v-model="form.body" rows="4" placeholder="What should clients know?"></textarea>
       <label>Tag</label><select v-model="form.tag"><option v-for="t in TAGS" :key="t">{{ t }}</option></select>
       <label class="row" style="margin-top: 14px; color: var(--ink)"><input v-model="form.published" type="checkbox" style="width: auto" /> Publish to the mobile app now</label>

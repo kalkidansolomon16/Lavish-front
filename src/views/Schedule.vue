@@ -8,7 +8,7 @@ const rows = computed(() =>
   state.sessions.filter((s) => myCourses.value.some((c) => c.id === s.courseId)).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)))
 const students = (courseId) => state.students.filter((s) => s.courseId === courseId && s.status === 'active').length
 const open = ref(false)
-const blank = () => ({ courseId: myCourses.value[0]?.id, title: '', kind: 'Practical', date: new Date(Date.now() + 864e5).toISOString().slice(0, 10), time: '10:00', room: 'Bole training room' })
+const blank = () => ({ courseId: myCourses.value[0]?.id, title: '', kind: 'Practical', date: new Date(Date.now() + 864e5).toISOString().slice(0, 10), time: '10:00', room: 'Addis Ababa training room' })
 const form = ref(blank())
 // A teacher is also a doctor — a class can't overlap treatments reception already approved.
 const busy = computed(() => doctorClashes(me, form.value.date, form.value.time, CLASS_MINS))

@@ -5,7 +5,6 @@ import { exportCsv, pushNotif } from '../ui'
 
 const role = state.user.role
 const edit = can('products.edit')
-const short = (b) => b.replace('Addis Ababa – ', '')
 const modal = ref(null) // 'new' | 'restock' | 'adjust' | 'history' | 'transfer'
 const tf = ref({ from: BRANCHES[0], to: BRANCHES[1], qty: 1 })
 const branch = ref(BRANCHES[0])
@@ -83,7 +82,7 @@ const exportAll = () =>
   <div class="card">
     <input v-model="search" placeholder="Search by product name or SKU…" style="max-width: 320px; margin-bottom: 12px" />
     <table>
-      <thead><tr><th>Product</th><th>Price</th><th v-for="b in BRANCHES" :key="b">{{ short(b) }}</th><th>On hand</th><th>Reserved</th><th>Available</th><th>Level</th><th></th></tr></thead>
+      <thead><tr><th>Product</th><th>Price</th><th v-for="b in BRANCHES" :key="b">{{ b }}</th><th>On hand</th><th>Reserved</th><th>Available</th><th>Level</th><th></th></tr></thead>
       <tbody>
         <tr v-for="p in rows" :key="p.id">
           <td>{{ p.name }}<small>{{ p.sku }} · {{ p.category }}</small></td>
@@ -142,7 +141,7 @@ const exportAll = () =>
 
     <form v-else-if="modal === 'transfer'" class="modal" @submit.prevent="saveTransfer">
       <h2>Transfer stock</h2>
-      <p class="note">{{ target.name }} · {{ BRANCHES.map((b) => short(b) + ' ' + target.branches[b]).join(' · ') }}</p>
+      <p class="note">{{ target.name }} · {{ BRANCHES.map((b) => b + ' ' + target.branches[b]).join(' · ') }}</p>
       <label>From</label><select v-model="tf.from"><option v-for="b in BRANCHES" :key="b" :value="b">{{ b }} ({{ target.branches[b] }})</option></select>
       <label>To</label><select v-model="tf.to"><option v-for="b in BRANCHES.filter((x) => x !== tf.from)" :key="b" :value="b">{{ b }} ({{ target.branches[b] }})</option></select>
       <label>Quantity</label><input v-model.number="tf.qty" type="number" min="1" :max="target.branches[tf.from]" required />

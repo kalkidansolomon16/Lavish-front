@@ -50,10 +50,10 @@ export function resetPerms() {
 }
 export const rolePerms = perms
 
-export const BRANCHES = ['Addis Ababa – Bole', 'Addis Ababa – Kazanchis', 'Hawassa']
+export const BRANCHES = ['Addis Ababa', 'Adama', 'Dire Dawa']
 const today = new Date().toISOString().slice(0, 10)
 const day = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10)
-// Splits opening stock across branches (most at Bole) so transfers have something to move.
+// Splits opening stock across branches (most at Addis Ababa) so transfers have something to move.
 const split = (n) => {
   const b = Math.ceil(n * 0.6), k = Math.floor((n - b) / 2)
   return { [BRANCHES[0]]: b, [BRANCHES[1]]: k, [BRANCHES[2]]: n - b - k }
@@ -65,23 +65,23 @@ export const state = reactive({
   toast: '',
 
   doctors: [
-    { id: 1, name: 'Dr. Meron Alemu', specialty: 'Dermatology', skills: ['Signature HydraFacial', 'PRP Skin Rejuvenation', 'Morpheus8 & Microneedling', 'Advanced Dermatology Treatments'], branch: 'Addis Ababa – Bole', status: 'Available', access: 'active' },
-    { id: 2, name: 'Dr. Yonas Tesfaye', specialty: 'Aesthetic Medicine', skills: ['Botox & Dermal Fillers', 'HIFU Face & Neck Lift', 'Signature HydraFacial'], branch: 'Addis Ababa – Bole', status: 'Available', access: 'active' },
-    { id: 3, name: 'Dr. Liya Getachew', specialty: 'Hair Transplant', skills: ['Hair Restoration Solutions'], branch: 'Addis Ababa – Kazanchis', status: 'In surgery', access: 'active' },
-    { id: 4, name: 'Dr. Biruk Mengistu', specialty: 'Body Transformation', skills: ['Body Contouring & Skin Tightening'], branch: 'Hawassa', status: 'Off today', access: 'active' },
-    { id: 5, name: 'Dr. Sara Kebede', specialty: 'Laser & Skin Resurfacing', skills: ['Advanced Dermatology Treatments'], branch: 'Addis Ababa – Kazanchis', status: 'Available', access: 'pending' },
+    { id: 1, name: 'Dr. Meron Alemu', specialty: 'Dermatology', skills: ['Signature HydraFacial', 'PRP Skin Rejuvenation', 'Morpheus8 & Microneedling', 'Advanced Dermatology Treatments'], branch: 'Addis Ababa', status: 'Available', access: 'active' },
+    { id: 2, name: 'Dr. Yonas Tesfaye', specialty: 'Aesthetic Medicine', skills: ['Botox & Dermal Fillers', 'HIFU Face & Neck Lift', 'Signature HydraFacial'], branch: 'Addis Ababa', status: 'Available', access: 'active' },
+    { id: 3, name: 'Dr. Liya Getachew', specialty: 'Hair Transplant', skills: ['Hair Restoration Solutions'], branch: 'Adama', status: 'In surgery', access: 'active' },
+    { id: 4, name: 'Dr. Biruk Mengistu', specialty: 'Body Transformation', skills: ['Body Contouring & Skin Tightening'], branch: 'Dire Dawa', status: 'Off today', access: 'active' },
+    { id: 5, name: 'Dr. Sara Kebede', specialty: 'Laser & Skin Resurfacing', skills: ['Advanced Dermatology Treatments'], branch: 'Adama', status: 'Available', access: 'pending' },
   ],
 
   staff: [
-    { id: 1, name: 'Dr. Melat Solomon', role: 'ceo', position: 'Chief Executive Officer', branch: 'Addis Ababa – Bole', phone: '+251 911 00 11 22', status: 'active' },
-    { id: 2, name: 'Hana Tadesse', role: 'reception', position: 'Front Desk', branch: 'Addis Ababa – Bole', phone: '+251 911 00 33 44', status: 'active' },
-    { id: 3, name: 'Tsion Alemayehu', role: 'reception', position: 'Front Desk', branch: 'Addis Ababa – Kazanchis', phone: '+251 911 00 55 66', status: 'active' },
-    { id: 4, name: 'Mekdes Tolera', role: 'reception', position: 'Front Desk', branch: 'Hawassa', phone: '+251 462 00 77 88', status: 'suspended' },
-    { id: 5, name: 'Dawit Haile', role: 'gm', position: 'General Manager', branch: 'Addis Ababa – Bole', phone: '+251 911 00 99 00', status: 'active' },
-    { id: 6, name: 'Abel Girma', role: 'ecommerce', position: 'E-commerce & Inventory', branch: 'Addis Ababa – Bole', phone: '+251 911 11 22 33', status: 'active' },
-    { id: 7, name: 'Selam Getahun', role: 'team', position: 'Nurse', branch: 'Addis Ababa – Bole', phone: '+251 911 44 55 66', status: 'active' },
-    { id: 8, name: 'Ruth Alemayehu', role: 'team', position: 'Skin Therapist', branch: 'Addis Ababa – Bole', phone: '+251 911 77 88 99', status: 'active' },
-    { id: 9, name: 'Yared Bekele', role: 'team', position: 'Delivery & Logistics', branch: 'Addis Ababa – Bole', phone: '+251 922 33 44 55', status: 'active' },
+    { id: 1, name: 'Dr. Melat Solomon', role: 'ceo', position: 'Chief Executive Officer', branch: 'Addis Ababa', phone: '+251 911 00 11 22', status: 'active' },
+    { id: 2, name: 'Hana Tadesse', role: 'reception', position: 'Front Desk', branch: 'Addis Ababa', phone: '+251 911 00 33 44', status: 'active' },
+    { id: 3, name: 'Tsion Alemayehu', role: 'reception', position: 'Front Desk', branch: 'Adama', phone: '+251 911 00 55 66', status: 'active' },
+    { id: 4, name: 'Mekdes Tolera', role: 'reception', position: 'Front Desk', branch: 'Dire Dawa', phone: '+251 25 111 77 88', status: 'suspended' },
+    { id: 5, name: 'Dawit Haile', role: 'gm', position: 'General Manager', branch: 'Addis Ababa', phone: '+251 911 00 99 00', status: 'active' },
+    { id: 6, name: 'Abel Girma', role: 'ecommerce', position: 'E-commerce & Inventory', branch: 'Addis Ababa', phone: '+251 911 11 22 33', status: 'active' },
+    { id: 7, name: 'Selam Getahun', role: 'team', position: 'Nurse', branch: 'Addis Ababa', phone: '+251 911 44 55 66', status: 'active' },
+    { id: 8, name: 'Ruth Alemayehu', role: 'team', position: 'Skin Therapist', branch: 'Addis Ababa', phone: '+251 911 77 88 99', status: 'active' },
+    { id: 9, name: 'Yared Bekele', role: 'team', position: 'Delivery & Logistics', branch: 'Addis Ababa', phone: '+251 922 33 44 55', status: 'active' },
   ],
 
   clients: [
@@ -133,7 +133,7 @@ export const state = reactive({
 
   complaints: [
     { id: 701, clientId: 4, subject: 'Redness after filler session', message: 'The area is still red after 3 days. Should I be worried?', priority: 'high', status: 'open', date: day(-1), reply: '' },
-    { id: 702, clientId: 6, subject: 'Long waiting time', message: 'I waited 40 minutes past my appointment time.', priority: 'medium', status: 'in-review', date: day(-4), reply: 'We are reviewing scheduling at Bole.' },
+    { id: 702, clientId: 6, subject: 'Long waiting time', message: 'I waited 40 minutes past my appointment time.', priority: 'medium', status: 'in-review', date: day(-4), reply: 'We are reviewing scheduling at our Addis Ababa branch.' },
     { id: 703, clientId: 2, subject: 'Wrong item delivered', message: 'I ordered the cream but got the serum.', priority: 'low', status: 'resolved', date: day(-9), reply: 'Replacement delivered. Apologies!' },
   ],
 
@@ -164,10 +164,10 @@ export const state = reactive({
   ],
 
   sessions: [
-    { id: 1, courseId: 1, teacherId: 1, date: day(1), time: '10:00', title: 'Chemical peels — practical', kind: 'Practical', room: 'Bole training room' },
-    { id: 2, courseId: 2, teacherId: 1, date: day(2), time: '14:00', title: 'HydraFacial protocol — demo', kind: 'Practical', room: 'Bole training room' },
+    { id: 1, courseId: 1, teacherId: 1, date: day(1), time: '10:00', title: 'Chemical peels — practical', kind: 'Practical', room: 'Addis Ababa training room' },
+    { id: 2, courseId: 2, teacherId: 1, date: day(2), time: '14:00', title: 'HydraFacial protocol — demo', kind: 'Practical', room: 'Addis Ababa training room' },
     { id: 3, courseId: 1, teacherId: 1, date: day(4), time: '14:00', title: 'Microdermabrasion — theory', kind: 'Theory', room: 'Online (Zoom)' },
-    { id: 4, courseId: 3, teacherId: 2, date: day(3), time: '09:00', title: 'Facial anatomy — cadaver lab', kind: 'Practical', room: 'Kazanchis lab' },
+    { id: 4, courseId: 3, teacherId: 2, date: day(3), time: '09:00', title: 'Facial anatomy — cadaver lab', kind: 'Practical', room: 'Adama lab' },
   ],
 
   // `login` = app credentials the CEO handed over; `activated` once the student has logged in.
@@ -184,7 +184,7 @@ export const state = reactive({
 
   // Shown on the client Home screen in the mobile app. Posted by the CEO or General Manager.
   news: [
-    { id: 1, title: 'New: Morpheus8 now at Kazanchis', body: 'Our most requested skin-tightening treatment is now available at the Kazanchis branch. Book from the app.', tag: 'New treatment', date: day(-1), by: 'Dr. Melat Solomon', published: true },
+    { id: 1, title: 'New: Morpheus8 now at Adama', body: 'Our most requested skin-tightening treatment is now available at the Adama branch. Book from the app.', tag: 'New treatment', date: day(-1), by: 'Dr. Melat Solomon', published: true },
     { id: 2, title: '20% off aftercare this week', body: 'All Aftercare products are 20% off in the Lavish shop until Sunday.', tag: 'Offer', date: day(-3), by: 'Dawit Haile', published: true },
     { id: 3, title: 'Academy: December intake open', body: 'Enrolment for the December Foundations intake is open — visit the academy or call to register.', tag: 'Academy', date: day(-6), by: 'Dawit Haile', published: false },
   ],
@@ -221,12 +221,12 @@ export const state = reactive({
   // People are keyed 's<id>' (staff) or 'd<id>' (doctors). Groups are created by the CEO / GM.
   announcements: [
     { id: 1, title: 'Welcome to Lavish Team', body: 'This is our new space for staff news, groups and direct messages. Please check it at the start of every shift.', by: 's1', date: day(-2), audience: 'all', readBy: ['s1', 's5'] },
-    { id: 2, title: 'Bole team meeting — Friday 8:30', body: 'Short stand-up before opening: new HydraFacial booster protocol and weekend staffing.', by: 's5', date: day(-1), audience: 2, readBy: ['s5'] },
+    { id: 2, title: 'Addis Ababa team meeting — Friday 8:30', body: 'Short stand-up before opening: new HydraFacial booster protocol and weekend staffing.', by: 's5', date: day(-1), audience: 2, readBy: ['s5'] },
   ],
   groups: [
     { id: 1, name: 'All Doctors', about: 'Clinical updates, protocols and case discussions', members: ['s1', 's5', 'd1', 'd2', 'd3', 'd4'], by: 's1', date: day(-20),
       messages: [{ from: 's1', text: 'Please review the updated consent form before Monday.', time: 'Mon 09:10' }, { from: 'd2', text: 'Done — looks good.', time: 'Mon 10:02' }] },
-    { id: 2, name: 'Bole Front Desk & Care', about: 'Daily coordination at the Bole branch', members: ['s5', 's2', 's7', 's8', 'd1'], by: 's5', date: day(-10),
+    { id: 2, name: 'Addis Ababa Front Desk & Care', about: 'Daily coordination at the Addis Ababa branch', members: ['s5', 's2', 's7', 's8', 'd1'], by: 's5', date: day(-10),
       messages: [{ from: 's2', text: 'Morning! 3 walk-ins already booked for this afternoon.', time: '08:45' }, { from: 's7', text: 'Treatment room 2 is ready.', time: '08:52' }] },
     { id: 3, name: 'Shop & Delivery', about: 'Orders, stock and deliveries', members: ['s1', 's6', 's9'], by: 's1', date: day(-6),
       messages: [{ from: 's6', text: 'Order #9001 is packed and ready for pickup.', time: 'Yesterday' }] },

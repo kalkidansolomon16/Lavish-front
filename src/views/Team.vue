@@ -228,8 +228,8 @@ function removeGroup(g) {
     <form class="modal" style="width: min(620px, 95vw); max-height: 90vh; overflow: auto" @submit.prevent="saveGroup">
       <h2>{{ groupForm.id ? (canGroups ? 'Manage group' : 'Group members') : 'New group' }}</h2>
       <template v-if="canGroups">
-        <label>Group name</label><input v-model="groupForm.name" required placeholder="e.g. Kazanchis team" />
-        <label>What is it for?</label><input v-model="groupForm.about" placeholder="e.g. Daily coordination at Kazanchis" />
+        <label>Group name</label><input v-model="groupForm.name" required placeholder="e.g. Adama team" />
+        <label>What is it for?</label><input v-model="groupForm.about" placeholder="e.g. Daily coordination at Adama" />
       </template>
       <label>Members <small class="note">· only members can open this group in Lavish Team</small></label>
       <div v-for="(list, role) in byRole" :key="role" class="t-role">

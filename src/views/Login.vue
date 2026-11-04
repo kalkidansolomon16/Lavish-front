@@ -40,7 +40,7 @@ const enter = (r) => { login(r); router.push('/' + nav()[0]) }
         </div>
 
         <div class="promise">
-          <span>Addis Ababa · Bole</span><i></i><span>Addis Ababa · Kazanchis</span><i></i><span>Hawassa</span>
+          <span>Addis Ababa</span><i></i><span>Adama</span><i></i><span>Dire Dawa</span>
         </div>
       </div>
     </div>

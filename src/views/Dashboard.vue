@@ -74,7 +74,7 @@ const complaintMix = computed(() => [
   { label: 'In review', value: count(state.complaints, (c) => c.status === 'in-review'), color: '#cba590' },
   { label: 'Resolved', value: count(state.complaints, (c) => c.status === 'resolved'), color: '#0a7379' },
 ])
-const branchStock = computed(() => BRANCHES.map((b) => ({ label: b.replace('Addis Ababa – ', 'Addis – '), value: state.products.reduce((t, p) => t + p.branches[b], 0) })))
+const branchStock = computed(() => BRANCHES.map((b) => ({ label: b, value: state.products.reduce((t, p) => t + p.branches[b], 0) })))
 const lowStock = computed(() => state.products.filter((p) => p.stock <= p.reorder))
 const classes = computed(() => state.sessions.filter((x) => x.teacherId === myDoc).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)))
 const feed = computed(() => ui.notifications.filter((n) => n.roles.includes(role)).slice(0, 5))
