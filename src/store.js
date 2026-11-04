@@ -108,6 +108,10 @@ export const state = reactive({
     { id: 107, clientId: 5, doctorId: null, service: 'Body Contouring & Skin Tightening', date: day(1), time: '11:00', status: 'pending', notified: false },
     { id: 108, clientId: 3, doctorId: null, service: 'Signature HydraFacial', date: day(1), time: '10:00', status: 'pending', notified: false },
     { id: 109, clientId: 6, doctorId: null, service: 'Hair Restoration Solutions', date: day(2), time: '09:00', status: 'pending', notified: false },
+    // Online consultations booked from the mobile app (45-min video call, ETB 4,000). Reception confirms them.
+    { id: 110, clientId: 1, doctorId: 1, service: 'Online Consultation', online: true, date: day(4), time: '16:00', status: 'approved', notified: true, link: 'meet.lavish.et/LV-110' },
+    { id: 111, clientId: 1, doctorId: null, service: 'Online Consultation', online: true, date: day(6), time: '14:00', status: 'pending', notified: false },
+    { id: 112, clientId: 3, doctorId: 2, service: 'Online Consultation', online: true, date: day(1), time: '15:00', status: 'pending', notified: false },
   ],
 
   payments: [
@@ -115,6 +119,7 @@ export const state = reactive({
     { id: 502, clientId: 6, ref: 'Morpheus8 & Microneedling', amount: 12000, method: 'Cash', status: 'unpaid', date: today },
     { id: 503, clientId: 4, ref: 'Botox & Dermal Fillers', amount: 18500, method: 'Chapa · CBE Birr', txRef: 'CHP-B84LZ0TD', status: 'paid', date: day(-3) },
     { id: 504, clientId: 2, ref: 'PRP Skin Rejuvenation', amount: 9000, method: 'Telebirr', status: 'unpaid', date: day(3) },
+    { id: 505, clientId: 1, ref: 'Online Consultation (45 min)', amount: 4000, method: 'Chapa · Telebirr', txRef: 'CHP-Q3N8VD5E', status: 'paid', date: day(-1), online: true, apptId: 110 },
   ],
 
   products: [
@@ -263,9 +268,13 @@ export const doctorName = (id) => state.doctors.find((d) => d.id === id)?.name ?
 export const courseTitle = (id) => state.courses.find((c) => c.id === id)?.title ?? ''
 export const etb = (n) => `ETB ${n.toLocaleString()}`
 
+// Online consultation booked from the mobile app: a 45-minute video call with a doctor, no branch.
+export const ONLINE = { service: 'Online Consultation', price: 4000, mins: 45 }
+
 // Doctors who also teach have one calendar: academy classes and treatments must not overlap.
 export const CLASS_MINS = 120
 export const TREATMENT_MINS = 60
+export const apptMins = (a) => (a.online ? ONLINE.mins : TREATMENT_MINS)
 const toMins = (t) => +t.slice(0, 2) * 60 + +t.slice(3, 5)
 const fmt = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 const overlaps = (t1, len1, t2, len2) => toMins(t1) < toMins(t2) + len2 && toMins(t2) < toMins(t1) + len1
@@ -275,8 +284,8 @@ export function doctorClashes(doctorId, date, time, length = TREATMENT_MINS, ski
     .filter((s) => s.teacherId === doctorId && s.date === date && overlaps(time, length, s.time, CLASS_MINS))
     .map((s) => ({ kind: 'class', text: `Teaching “${s.title}” ${s.time}–${fmt(toMins(s.time) + CLASS_MINS)} · ${s.room}` }))
   const treatments = state.appointments
-    .filter((a) => a.id !== skipApptId && a.doctorId === doctorId && a.status === 'approved' && a.date === date && overlaps(time, length, a.time, TREATMENT_MINS))
-    .map((a) => ({ kind: 'treatment', text: `Treating ${clientName(a.clientId)} — ${a.service} at ${a.time}` }))
+    .filter((a) => a.id !== skipApptId && a.doctorId === doctorId && a.status === 'approved' && a.date === date && overlaps(time, length, a.time, apptMins(a)))
+    .map((a) => ({ kind: 'treatment', text: a.online ? `Online session with ${clientName(a.clientId)} at ${a.time} (45 min)` : `Treating ${clientName(a.clientId)} — ${a.service} at ${a.time}` }))
   return [...classes, ...treatments]
 }
 
@@ -292,14 +301,16 @@ export function suggestDoctors(appt) {
     let score = 0
     let available = true
 
+    // Every doctor gives online consultations; for other bookings the treatment must match their skills.
     const exact = (d.skills ?? []).includes(appt.service)
     const overlap = words(appt.service).some((w) => words(d.specialty).includes(w))
-    if (exact) { score += 50; reasons.push({ ok: true, text: `Specialist in ${appt.service}` }) }
+    if (appt.online) { score += 50; reasons.push({ ok: true, text: `Gives online consultations (${d.specialty})` }) }
+    else if (exact) { score += 50; reasons.push({ ok: true, text: `Specialist in ${appt.service}` }) }
     else if (overlap) { score += 30; reasons.push({ ok: true, text: `Related specialty: ${d.specialty}` }) }
     else reasons.push({ ok: false, text: `Not a ${appt.service} specialist (${d.specialty})` })
 
     const clash = state.appointments.some((a) => active(a) && a.doctorId === d.id && a.date === appt.date && a.time === appt.time)
-    const teaching = doctorClashes(d.id, appt.date, appt.time).find((c) => c.kind === 'class')
+    const teaching = doctorClashes(d.id, appt.date, appt.time, apptMins(appt)).find((c) => c.kind === 'class')
     if (teaching) { available = false; reasons.push({ ok: false, text: teaching.text }) }
     else if (clash) { available = false; reasons.push({ ok: false, text: `Already booked at ${appt.time}` }) }
     else if (isToday && d.status !== 'Available') { available = false; reasons.push({ ok: false, text: `${d.status} today` }) }
@@ -396,14 +407,26 @@ function takeFromBranches(p, qty) {
 }
 
 // Temporary password the student must change at first login.
+// Confirming an online session creates its video link and a payment request the client pays in the app.
+function confirmOnline(a) {
+  a.link = 'meet.lavish.et/LV-' + String(a.id).slice(-5)
+  if (!state.payments.some((p) => p.apptId === a.id))
+    state.payments.unshift({ id: Date.now(), clientId: a.clientId, ref: 'Online Consultation (45 min)', amount: ONLINE.price, method: '—', status: 'unpaid', date: a.date, online: true, apptId: a.id })
+}
+
 const tempPassword = () => 'LA-' + Math.random().toString(36).slice(2, 6).toUpperCase() + Math.floor(10 + Math.random() * 90)
 
 export const actions = {
   assignDoctor(a, d) {
     a.doctorId = d.id; a.status = 'approved'; a.notified = true
-    notify(`Assigned to ${d.name} and approved — doctor notified`)
+    if (a.online) confirmOnline(a)
+    notify(a.online ? `Online session confirmed with ${d.name} — video link & payment request sent to the client’s app` : `Assigned to ${d.name} and approved — doctor notified`)
   },
-  approveAppointment(a) { a.status = 'approved'; a.notified = true; notify(`Approved — ${doctorName(a.doctorId)} has been notified`) },
+  approveAppointment(a) {
+    a.status = 'approved'; a.notified = true
+    if (a.online) confirmOnline(a)
+    notify(a.online ? `Online session confirmed — ${doctorName(a.doctorId)} notified, video link & payment request sent to the client’s app` : `Approved — ${doctorName(a.doctorId)} has been notified`)
+  },
   declineAppointment(a) { a.status = 'declined'; notify('Appointment declined, client informed') },
   completeAppointment(a) {
     a.status = 'completed'

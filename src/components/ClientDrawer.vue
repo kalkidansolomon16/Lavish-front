@@ -50,7 +50,7 @@ const startHistory = () => (c.value.history = { source: 'Walk-in', concern: '', 
         <h3>Treatment timeline</h3>
         <ul class="timeline">
           <li v-for="a in mine(state.appointments)" :key="a.id">
-            <b>{{ a.service }}</b><small>{{ a.date }} · {{ a.time }} · {{ a.status }}</small>
+            <b>{{ a.online ? '🎥 Online consultation' : a.service }}</b><small>{{ a.date }} · {{ a.time }} · {{ a.status }}</small>
           </li>
           <li v-if="!mine(state.appointments).length"><small>No visits yet</small></li>
         </ul>
