@@ -79,7 +79,7 @@ const exportAll = () =>
       <tbody>
         <tr v-for="p in state.payments" :key="p.id">
           <td><ClientLink :id="p.clientId" /><small>{{ p.date }}</small></td>
-          <td>{{ p.ref }}</td>
+          <td>{{ p.online ? '🎥 ' : '' }}{{ p.ref }}</td>
           <td>{{ etb(p.amount) }}</td>
           <td>{{ p.status === 'paid' ? p.method : '—' }}<small v-if="p.txRef">Ref {{ p.txRef }}</small></td>
           <td><span class="badge" :class="p.status">{{ p.status === 'awaiting' ? 'awaiting client' : p.status }}</span></td>
@@ -96,7 +96,7 @@ const exportAll = () =>
   <div v-if="collect" class="modal-bg" @click.self="step !== 'processing' && close()">
     <div class="modal" style="width: min(520px, 94vw)">
       <h2>Collect payment</h2>
-      <p class="note">{{ clientName(collect.clientId) }} · {{ collect.ref }}</p>
+      <p class="note">{{ clientName(collect.clientId) }} · {{ collect.ref }}<span v-if="collect.online"> · 🎥 online — the client pays from the app, no cash</span></p>
       <p class="serif" style="font-size: 36px; margin: 8px 0 16px">{{ etb(collect.amount) }}</p>
 
       <template v-if="step === 'choose'">
@@ -106,7 +106,7 @@ const exportAll = () =>
         <button class="pay-opt chapa" @click="step = 'checkout'">
           <b>💳 Chapa checkout at the desk</b><span>Client chooses Telebirr, CBE Birr, M-Pesa or card on this screen.</span>
         </button>
-        <button class="pay-opt" @click="cash">
+        <button v-if="!collect.online" class="pay-opt" @click="cash">
           <b>💵 Cash received</b><span>Record a cash payment taken at reception.</span>
         </button>
       </template>

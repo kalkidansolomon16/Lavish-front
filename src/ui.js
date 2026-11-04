@@ -29,6 +29,7 @@ export const ui = reactive({
     { id: 4, text: 'Eden Fikru asked to reschedule Friday’s practical', roles: ['teacher'], time: '1h ago', read: false, to: '/students' },
     { id: 5, text: 'Hanna Mulugeta completed HydraFacial & Skin Analysis — certificate ready to issue', roles: ['gm', 'ceo'], time: '4h ago', read: false, to: '/academy' },
     { id: 6, text: 'Dr. Sara Kebede is waiting for portal access', roles: ['gm', 'ceo'], time: '6h ago', read: true, to: '/staff' },
+    { id: 7, text: 'Mulu Desta booked a 45-min online session with Dr. Yonas — waiting for you to confirm', roles: ['reception', 'ceo'], time: '1h ago', read: false, to: '/appointments' },
     { id: 3, text: 'Mulu Desta requested HIFU Face & Neck Lift', roles: ['reception', 'ceo'], time: '5h ago', read: true, to: '/appointments' },
   ],
 })
@@ -66,6 +67,10 @@ export function startLive() {
     [14000, () => {
       state.appointments.unshift({ id: Date.now(), clientId: 5, doctorId: 2, service: 'Signature HydraFacial', date: day(2), time: '12:00', status: 'pending', notified: false })
       return ['Saron Mekonnen booked Signature HydraFacial with Dr. Yonas', ['reception', 'ceo'], '/appointments']
+    }],
+    [24000, () => {
+      state.appointments.unshift({ id: Date.now(), clientId: 2, doctorId: 1, service: 'Online Consultation', online: true, date: day(3), time: '13:30', status: 'pending', notified: false })
+      return ['Rahel Assefa requested a 45-min online session with Dr. Meron — confirm it in Appointments', ['reception', 'ceo'], '/appointments']
     }],
     [32000, () => {
       const o = { id: 9004, clientId: 6, items: 'SPF 50 Mineral Sunscreen ×1', total: 1900, address: 'Kazanchis, Addis Ababa', lines: [{ productId: 3, qty: 1 }], date: day(0), payment: 'unpaid', method: 'Pay on delivery' }

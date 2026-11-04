@@ -152,7 +152,7 @@ const latestAnn = computed(() => can('page.team') && state.announcements.find((a
       <h2 style="margin-bottom: 8px">Today’s schedule</h2>
       <ul class="timeline">
         <li v-for="a in schedule" :key="a.id">
-          <b>{{ a.time }} · {{ a.service }}</b>
+          <b>{{ a.time }} · {{ a.online ? '🎥 Online session (45 min)' : a.service }}</b>
           <small><ClientLink :id="a.clientId" /><span v-if="role !== 'doctor'"> with {{ doctorName(a.doctorId) }}</span></small>
         </li>
         <li v-if="!schedule.length"><small>No approved sessions today</small></li>
@@ -173,7 +173,7 @@ const latestAnn = computed(() => can('page.team') && state.announcements.find((a
       <tbody>
         <tr v-for="a in upcoming" :key="a.id">
           <td><ClientLink :id="a.clientId" /></td>
-          <td>{{ a.service }}</td>
+          <td>{{ a.online ? '🎥 Online consultation' : a.service }}</td>
           <td v-if="role !== 'doctor'">{{ doctorName(a.doctorId) }}</td>
           <td>{{ a.date }} · {{ a.time }}</td>
           <td><span class="badge" :class="a.status">{{ a.status }}</span></td>
