@@ -110,6 +110,9 @@ kbd { font: 11px Roboto; background: var(--bg); border: 1px solid var(--line); b
 .assign-banner { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; border-left: 4px solid var(--gold); background: var(--gold-soft); }
 .chip.nodoc { border-color: var(--bad); }
 .chip.lesson { background: var(--gold); color: #262626; cursor: default; }
+/* online sessions (45-min video consultations booked in the app) */
+.chip.online { border-left: 4px solid var(--gold); }
+.online-banner { border-left-color: var(--dark); background: var(--mint); }
 .chip .clash, td .clash { color: var(--bad); font-weight: 500; opacity: 1; }
 .sugg { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; }
 .sugg.best { border: 2px solid var(--gold); background: #fffaf6; }
