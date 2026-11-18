@@ -1,0 +1,32 @@
+/*
+ * Tailwind CSS v4 with the Lavish design tokens (same as the mobile app).
+ *
+ * Tailwind's reset ("preflight") is deliberately NOT imported yet: the pages that still use
+ * styles.css / extras.css would change look. Once every page uses Tailwind classes,
+ * replace the two imports below with   @import "tailwindcss";   and delete the old CSS files.
+ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@theme {
+  --color-teal: #0a7379;        /* primary, buttons, headers */
+  --color-teal-deep: #06565b;   /* gradients, pressed */
+  --color-gold: #cba590;        /* accent */
+  --color-gold-soft: #f3e8e1;
+  --color-mint: #d9e8e5;
+  --color-canvas: #f6f5f4;      /* page background */
+  --color-ink: #262626;
+  --color-muted: #808285;
+  --color-line: #e2e1df;
+  --color-ok: #3f8a5f;
+  --color-warn: #c78a1b;
+  --color-bad: #b8483f;
+
+  --font-serif: "EB Garamond", serif;
+  --font-sans: Roboto, "Noto Sans Ethiopic", system-ui, sans-serif;
+
+  --radius-card: 20px;
+  --radius-btn: 16px;
+  --radius-input: 14px;
+}

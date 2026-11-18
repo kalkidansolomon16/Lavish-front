@@ -1,13 +1,16 @@
 <script setup>
-import { computed } from 'vue'
+// Search, language switch and the notification bell (real notifications from the API).
 import { useRouter } from 'vue-router'
-import { ui, visibleNotifs } from '../ui'
+import { ui } from '../ui'
+import { useNotifications, ago } from '../stores/notifications'
 
 const router = useRouter()
-const list = computed(() => visibleNotifs())
-const unread = computed(() => list.value.filter((n) => !n.read).length)
-const open = (n) => { n.read = true; ui.bell = false; router.push(n.to) }
-const readAll = () => list.value.forEach((n) => (n.read = true))
+const bell = useNotifications()
+const open = (n) => {
+  bell.read(n)
+  ui.bell = false
+  if (n.path) router.push(n.path)
+}
 </script>
 
 <template>
@@ -19,16 +22,16 @@ const readAll = () => list.value.forEach((n) => (n.read = true))
         <button :class="{ on: ui.lang === 'am' }" @click="ui.lang = 'am'">አማ</button>
       </div>
       <div class="bell-wrap">
-        <button class="bell" @click="ui.bell = !ui.bell">🔔<i v-if="unread">{{ unread }}</i></button>
+        <button class="bell" aria-label="Notifications" @click="ui.bell = !ui.bell">🔔<i v-if="bell.unread">{{ bell.unread }}</i></button>
         <div v-if="ui.bell" class="bell-menu">
           <div class="row" style="justify-content: space-between; padding: 12px 16px">
             <b class="serif" style="font-size: 18px">Notifications</b>
-            <a class="link" @click="readAll">Mark all read</a>
+            <a class="link" @click="bell.readAll()">Mark all read</a>
           </div>
-          <button v-for="n in list" :key="n.id" :class="{ unread: !n.read }" @click="open(n)">
-            {{ n.text }}<small>{{ n.time }}</small>
+          <button v-for="n in bell.items" :key="n.id" :class="{ unread: !n.read }" @click="open(n)">
+            <b class="block">{{ n.title }}</b>{{ n.body }}<small>{{ ago(n.created_at) }}</small>
           </button>
-          <p v-if="!list.length" class="empty">You're all caught up</p>
+          <p v-if="!bell.items.length" class="empty">You're all caught up</p>
         </div>
       </div>
     </div>

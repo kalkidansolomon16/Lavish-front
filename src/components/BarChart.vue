@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 const props = defineProps({ data: Array, money: Boolean })
-const max = computed(() => Math.max(...props.data.map((d) => d.value)) * 1.15)
+const max = computed(() => Math.max(1, ...props.data.map((d) => d.value)) * 1.15)
 const fmt = (v) => (props.money ? (v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v) : v)
 </script>
 
