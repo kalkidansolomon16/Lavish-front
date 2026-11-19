@@ -65,8 +65,32 @@ async function openTrack(o) {
 }
 const stamped = (o, key) => o.timeline?.find((s) => s.status === key)?.at
 
+// Confirm delivery only after the client tapped "I received my order" in the app — or with a reason.
+const overriding = ref(null) // { o, reason, needReason, needMoney, collected, method, error }
+const podOpen = (o) => o.payment_method?.value === 'pay_on_delivery' && ['unpaid', 'pending', 'failed'].includes(o.payment?.status)
+async function confirmWithoutClient() {
+  const ov = overriding.value
+  if (ov.needReason && ov.reason.trim().length < 4) { ov.error = 'Write how you know the client received it (e.g. confirmed by phone).'; return }
+  if (ov.needMoney && ov.collected === null) { ov.error = 'Did the courier collect the payment? Choose one.'; return }
+  try {
+    const res = await api.post(`/staff/orders/${ov.o.id}/advance`, {
+      ...(ov.needReason ? { override_reason: ov.reason.trim() } : {}),
+      ...(ov.needMoney ? { collected: ov.collected, method: ov.collected ? ov.method : undefined } : {}),
+    })
+    replace(res.data)
+    res.meta?.low_stock?.forEach((p) => notify(`Low stock: ${p.name} — ${p.stock} left`))
+    overriding.value = null
+    notify(`Order #${ov.o.id}: delivered`)
+    if (tab.value !== '' && tab.value !== 'open') load()
+  } catch (e) { ov.error = e.message }
+}
+const waitingForClient = (o) => o.next_action?.status === 'delivered' && !o.received_at
+
 async function advance(o) {
   const step = o.next_action
+  if (step.status === 'delivered' && (!o.received_at || podOpen(o))) {
+    return (overriding.value = { o, reason: '', needReason: !o.received_at, needMoney: podOpen(o), collected: null, method: 'cash', error: '' })
+  }
   if (step.needs_courier && track.value?.id !== o.id) return openTrack(o)
   if (step.needs_courier && !courier.value.name.trim()) return notify('Add the courier’s name first')
   if (!(await ask({ title: `${step.label}?`, body: `Order #${o.id} for ${o.client?.name}.\nThe client gets an email and an app notification.${step.status === 'delivered' ? '\nStock is deducted now.' : ''}`, ok: step.label }))) return
@@ -157,9 +181,12 @@ const exportAll = () => exportCsv('lavish-orders', rows.value.map((o) => ({ Orde
           <td>
             <span class="badge" :class="badgeClass(o.status)">{{ o.status_label }}</span>
             <div v-if="o.status !== 'cancelled'" class="o-bar"><i v-for="(s, i) in FLOW" :key="s.key" :class="{ on: i <= idx(o.status) }" :title="s.label"></i></div>
+            <small v-if="o.received_at" class="rcv ok">✓ Client confirmed receipt {{ when(o.received_at) }}</small>
+            <small v-else-if="o.received_override" class="rcv">Confirmed by staff: {{ o.received_override }}</small>
+            <small v-else-if="waitingForClient(o)" class="rcv wait">⏳ Waiting for the client to confirm in the app</small>
           </td>
           <td class="row" style="flex-wrap: nowrap">
-            <button v-if="canUpdate && o.next_action" class="btn gold sm" @click="advance(o)">{{ o.next_action.label }}{{ o.next_action.needs_courier ? '…' : '' }}</button>
+            <button v-if="canUpdate && o.next_action" class="btn sm" :class="waitingForClient(o) ? 'ghost' : 'gold'" @click="advance(o)">{{ waitingForClient(o) ? 'Confirm without client…' : o.next_action.label }}{{ o.next_action.needs_courier ? '…' : '' }}</button>
             <button class="btn ghost sm" @click="openTrack(o)">Track</button>
           </td>
         </tr>
@@ -238,10 +265,38 @@ const exportAll = () => exportCsv('lavish-orders', rows.value.map((o) => ({ Orde
         <span v-else></span>
         <div class="row">
           <button class="btn ghost" @click="track = null">Close</button>
-          <button v-if="canUpdate && track.next_action" class="btn gold" @click="advance(track)">{{ track.next_action.label }} & email client</button>
+          <button v-if="canUpdate && track.next_action" class="btn" :class="waitingForClient(track) ? 'ghost' : 'gold'" @click="advance(track)">{{ waitingForClient(track) ? 'Confirm without client…' : track.next_action.label + ' & email client' }}</button>
         </div>
       </div>
+      <p v-if="waitingForClient(track)" class="note" style="margin-top: 10px">⏳ Waiting for {{ track.client?.name }} to tap “I received my order” in the app. You’ll get a notification — then confirm the delivery.</p>
+      <p v-else-if="track.received_at && track.next_action?.status === 'delivered'" class="note" style="margin-top: 10px; color: var(--teal-deep)">✓ {{ track.client?.name }} confirmed they received it {{ when(track.received_at) }}. Confirm the delivery.</p>
     </div>
+  </div>
+
+  <div v-if="overriding" class="modal-bg" style="z-index: 45" @click.self="overriding = null">
+    <form class="modal" @submit.prevent="confirmWithoutClient">
+      <h2>Confirm delivery of order #{{ overriding.o.id }}</h2>
+      <p class="note">{{ overriding.o.client?.name }} · {{ etb(overriding.o.total) }} · {{ overriding.o.payment_method?.label }}</p>
+      <template v-if="overriding.needReason">
+        <p class="note" style="margin-top: 10px">⏳ The client hasn’t tapped “I received my order” in the app yet. If you know they received it, write how — it is saved with the order.</p>
+        <label class="lbl">How do you know?</label>
+        <input v-model="overriding.reason" minlength="4" maxlength="255" placeholder="e.g. Client confirmed by phone · courier photo" style="width: 100%" />
+      </template>
+      <p v-else class="note" style="margin-top: 10px; color: var(--teal-deep)">✓ The client confirmed they received it {{ when(overriding.o.received_at) }}.</p>
+      <template v-if="overriding.needMoney">
+        <label class="lbl">Pay on delivery — did the courier collect {{ etb(overriding.o.payment?.due_amount ?? overriding.o.total) }}?</label>
+        <div class="row" style="gap: 8px">
+          <button type="button" class="btn sm" :class="overriding.collected === true ? 'gold' : 'ghost'" @click="overriding.collected = true">Yes, collected</button>
+          <button type="button" class="btn sm" :class="overriding.collected === false ? 'danger' : 'ghost'" @click="overriding.collected = false">Not paid yet</button>
+        </div>
+        <select v-if="overriding.collected" v-model="overriding.method" style="width: 100%; margin-top: 8px">
+          <option value="cash">Cash</option><option value="telebirr">Telebirr</option><option value="cbe_birr">CBE Birr</option><option value="bank_transfer">Bank transfer</option><option value="card">Card</option>
+        </select>
+        <p v-if="overriding.collected === false" class="note" style="margin-top: 6px">The order is marked delivered but stays <b>unpaid</b>: it shows under Payments → Finished, not paid, and the client is asked to pay.</p>
+      </template>
+      <p v-if="overriding.error" class="note" style="color: var(--bad)">{{ overriding.error }}</p>
+      <div class="row" style="justify-content: flex-end; margin-top: 14px"><button type="button" class="btn ghost" @click="overriding = null">Cancel</button><button class="btn gold">Confirm delivery</button></div>
+    </form>
   </div>
 
   <!-- mark paid -->
@@ -272,4 +327,8 @@ label { display: block; font-size: 13px; margin: 10px 0 4px; }
 .seg-top { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: #f3f2f0; margin-bottom: 14px; }
 .seg-top button { padding: 8px 16px; border: 0; border-radius: 9px; background: none; cursor: pointer; font-size: 13.5px; }
 .seg-top button.on { background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .1); color: var(--teal-deep); }
+.rcv { display: block; margin-top: 4px; font-size: 11.5px; color: var(--muted); }
+.rcv.ok { color: var(--teal-deep); }
+.rcv.wait { color: #a2581a; }
+.lbl { display: block; margin: 14px 0 6px; font-size: 13px; }
 </style>

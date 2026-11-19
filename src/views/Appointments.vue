@@ -110,10 +110,21 @@ async function approve(a) {
     busy.value = false
   }
 }
+// The client still owes for a finished treatment: only staff who collect payments may go ahead anyway.
+async function overrideOwed(e) {
+  if (e.code !== 'client_owes') return false
+  if (!e.details?.can_override) { notify(e.message); return false }
+  return ask({ title: 'This client hasn’t paid for their last treatment', body: `${e.message}\n\nGo ahead anyway (for example, they are paying now at the desk)?`, ok: 'Go ahead', tone: 'danger' })
+}
 async function confirmApprove() {
   const a = checking.value.a
   try {
-    await api.post(`/staff/appointments/${a.id}/approve`)
+    try {
+      await api.post(`/staff/appointments/${a.id}/approve`)
+    } catch (e) {
+      if (!(await overrideOwed(e))) throw e
+      await api.post(`/staff/appointments/${a.id}/approve`, { allow_unpaid: true })
+    }
     checking.value = null
     notify(a.is_online ? 'Online session confirmed' : 'Approved — doctor and client notified')
     refresh()
@@ -166,7 +177,12 @@ async function assign(d) {
   const a = assigning.value.a
   if (!(await ask({ title: `Assign ${d.name}?`, body: `${a.client?.name} · ${what(a)} on ${a.date} at ${a.time}.\n${d.name} and the client will be notified.`, ok: a.is_online ? 'Assign & confirm' : 'Assign & approve' }))) return
   try {
-    await api.post(`/staff/appointments/${a.id}/approve`, { doctor_id: d.id })
+    try {
+      await api.post(`/staff/appointments/${a.id}/approve`, { doctor_id: d.id })
+    } catch (e) {
+      if (!(await overrideOwed(e))) throw e
+      await api.post(`/staff/appointments/${a.id}/approve`, { doctor_id: d.id, allow_unpaid: true })
+    }
     assigning.value = null
     notify(`${d.name} assigned`)
     refresh()

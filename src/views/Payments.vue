@@ -3,6 +3,7 @@
 // bank transfer, cash…) and upload the receipt in the app; reception checks it here, or records the payment
 // at the desk (optionally attaching the receipt). Vouchers, points and gift cards go through Checkout.
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { api } from '../api/http'
 import { useAuth } from '../stores/auth'
 import { ask } from '../confirm'
@@ -24,7 +25,7 @@ const page = ref(1)
 const loading = ref(false)
 const error = ref('')
 
-const TABS = [['', 'All'], ['in_review', 'Receipts to check'], ['unpaid,failed', 'Unpaid'], ['paid', 'Paid'], ['refund_due', 'Refund due']]
+const TABS = [['', 'All'], ['owing', '⚠ Finished, not paid'], ['in_review', 'Receipts to check'], ['unpaid,failed', 'Unpaid'], ['paid', 'Paid'], ['refund_due', 'Refund due']]
 const METHODS = [['cash', 'Cash'], ['telebirr', 'Telebirr'], ['cbe_birr', 'CBE Birr'], ['bank_transfer', 'Bank transfer'], ['card', 'Card']]
 const STATUS = { unpaid: ['Unpaid', 'unpaid'], pending: ['Awaiting client', 'pending'], in_review: ['Receipt to check', 'pending'], paid: ['Paid', 'paid'], failed: ['Failed', 'declined'], refund_due: ['Refund due', 'declined'], refunded: ['Refunded', 'cancelled'], cancelled: ['Cancelled', 'cancelled'] }
 
@@ -33,6 +34,15 @@ async function load(reset = true) {
   loading.value = true
   error.value = ''
   try {
+    if (tab.value === 'owing') {
+      // Treatments already done but not paid — collect before the client leaves.
+      const res = await api.get('/staff/payments/owing')
+      const term = q.value.trim().toLowerCase()
+      rows.value = res.data.filter((r) => !term || `${r.client.name} ${r.client.phone}`.toLowerCase().includes(term))
+        .map((r) => ({ ...r.payment, _done: r.completed_at, _today: r.today }))
+      meta.value = { ...meta.value, total: rows.value.length, current_page: 1, last_page: 1 }
+      return
+    }
     const res = await api.get('/staff/payments', { status: tab.value || undefined, q: q.value || undefined, page: page.value, per_page: 30 })
     rows.value = res.data
     meta.value = res.meta
@@ -44,7 +54,9 @@ async function load(reset = true) {
 }
 let t
 watch(q, () => { clearTimeout(t); t = setTimeout(load, 300) })
-onMounted(load)
+const route = useRoute()
+onMounted(() => { if (route.query.tab === 'owing') tab.value = 'owing'; load() })
+watch(() => route.query.tab, (v) => { if (v === 'owing') { tab.value = 'owing'; load() } })
 const more = () => { page.value++; load(false) }
 const hasMore = computed(() => meta.value.current_page < meta.value.last_page)
 const replace = (p) => { const i = rows.value.findIndex((x) => x.id === p.id); if (i >= 0) rows.value[i] = { ...rows.value[i], ...p }; load() }
@@ -151,7 +163,7 @@ const exportAll = () => exportCsv('lavish-payments', rows.value.map((p) => ({
       <tbody>
         <tr v-for="p in rows" :key="p.id">
           <td><ClientLink :id="p.client?.id" :name="p.client?.name" /><small>{{ day(p.created_at) }}</small></td>
-          <td>{{ p.description }}<small>{{ { appointment: 'Treatment', order: 'Shop order', gift_card: 'Gift card' }[p.payable?.type] ?? '' }}</small></td>
+          <td>{{ p.description }}<small>{{ { appointment: 'Treatment', order: 'Shop order', gift_card: 'Gift card' }[p.payable?.type] ?? '' }}</small><small v-if="p._done" style="color: #a2581a">Treatment done {{ new Date(p._done).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }}{{ p._today ? ' · today' : '' }}</small></td>
           <td>{{ etb(p.amount) }}<small v-if="p.discount_amount || p.gift_card_amount">{{ etb(p.due_amount) }} in money<template v-if="p.discount_amount"> · −{{ etb(p.discount_amount) }} rewards</template><template v-if="p.gift_card_amount"> · −{{ etb(p.gift_card_amount) }} gift card</template></small></td>
           <td>{{ p.method?.label ?? '—' }}<small v-if="p.provider_reference">Ref {{ p.provider_reference }}</small><small v-else-if="p.receipt?.reference && p.status === 'in_review'">Ref {{ p.receipt.reference }}</small></td>
           <td><span class="badge" :class="STATUS[p.status]?.[1]">{{ STATUS[p.status]?.[0] ?? p.status }}</span><small v-if="p.receipt?.status === 'rejected' && p.status === 'unpaid'" style="color: var(--bad)">Receipt rejected</small></td>
