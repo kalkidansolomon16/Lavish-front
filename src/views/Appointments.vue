@@ -96,25 +96,63 @@ const checking = ref(null)   // conflict found when approving
 const assigning = ref(null)  // pick a doctor (with suggestions)
 const busy = ref(false)
 
+// Approve: always review the doctor's day first (free / booked / requested / class), then approve,
+// choose another doctor, ask the client to change, or decline.
 async function approve(a) {
   if (!a.doctor) return openAssign(a)
   busy.value = true
   try {
     const check = (await api.get(`/staff/appointments/${a.id}/check`)).data
-    if (check.clashes.length) return (checking.value = { a, ...check })
-    if (!(await ask({
-      title: a.is_online ? 'Confirm this online session?' : 'Approve this booking?',
-      body: `${a.client?.name} · ${what(a)}\n${a.date} at ${a.time} with ${a.doctor.name}\n\n${a.is_online ? 'The client gets the video link and a payment request.' : 'The doctor and the client are notified straight away.'}`,
-      ok: a.is_online ? 'Confirm session' : 'Approve',
-    }))) return
-    await api.post(`/staff/appointments/${a.id}/approve`)
-    notify(a.is_online ? 'Online session confirmed' : 'Approved — doctor and client notified')
-    refresh()
+    checking.value = { a, ...check }
   } catch (e) {
     notify(e.message)
   } finally {
     busy.value = false
   }
+}
+async function confirmApprove() {
+  const a = checking.value.a
+  try {
+    await api.post(`/staff/appointments/${a.id}/approve`)
+    checking.value = null
+    notify(a.is_online ? 'Online session confirmed' : 'Approved — doctor and client notified')
+    refresh()
+  } catch (e) {
+    notify(e.message)
+  }
+}
+const SLOT = { free: 'Free', this: 'This booking', booked: 'Booked', requested: 'Requested', class: 'Teaching', past: 'Past' }
+
+// Ask the client to change (doctor busy): time, doctor or either, with suggested free times and doctors.
+const changing = ref(null)
+function openChange(src) {
+  const c = src ?? checking.value ?? assigning.value
+  const freeDocs = (c.suggestions ?? []).filter((x) => x.available && x.doctor.id !== c.a.doctor?.id)
+  changing.value = {
+    a: c.a, kind: c.clashes?.length ? 'either' : 'time', message: '',
+    times: (c.free_times ?? []).map((t) => ({ ...t, on: false })).map((t, i) => ({ ...t, on: i < 3 })),
+    doctors: freeDocs.map((x, i) => ({ id: x.doctor.id, name: x.doctor.name, on: i < 2 })),
+    error: '',
+  }
+}
+const fmtDay = (d) => new Date(d + 'T00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+async function sendChange() {
+  const c = changing.value
+  const times = c.kind === 'doctor' ? [] : c.times.filter((t) => t.on).map(({ date, time }) => ({ date, time }))
+  const doctorIds = c.kind === 'time' ? [] : c.doctors.filter((d) => d.on).map((d) => d.id)
+  if (!(await ask({
+    title: `Ask ${c.a.client?.name} to change?`,
+    body: `${{ time: 'Choose another time', doctor: 'Choose another doctor', either: 'Choose another time or doctor' }[c.kind]}${times.length ? '\nSuggested times: ' + times.map((t) => fmtDay(t.date) + ' ' + t.time).join(', ') : ''}${doctorIds.length ? '\nSuggested doctors: ' + c.doctors.filter((d) => d.on).map((d) => d.name).join(', ') : ''}\n\nThe client gets a phone notification and an SMS, and changes it in the app.`,
+    ok: 'Send to client',
+  }))) return
+  try {
+    await api.post(`/staff/appointments/${c.a.id}/request-change`, { kind: c.kind, message: c.message.trim() || undefined, times, doctor_ids: doctorIds })
+    changing.value = null
+    checking.value = null
+    assigning.value = null
+    notify('Sent — the client will choose a new time or doctor')
+    refresh()
+  } catch (e) { c.error = e.message }
 }
 async function openAssign(a) {
   try {
@@ -264,7 +302,7 @@ const planTime = (p) => `${local(p.starts_at).time}–${local(p.ends_at).time}`
             </td>
             <td><span v-if="!a.doctor" class="badge open">Needs doctor</span><template v-else>{{ a.doctor.name }}</template></td>
             <td>{{ a.date }}<small>{{ a.time }} · {{ a.duration_minutes }} min</small></td>
-            <td><span class="badge" :class="a.status">{{ a.status }}</span><small v-if="a.payment">{{ a.payment.status === 'paid' ? 'Paid' : a.payment.status === 'in_review' ? 'Receipt to check' : 'Not paid' }}</small></td>
+            <td><span class="badge" :class="a.status">{{ a.status }}</span><small v-if="a.change_request" style="color: var(--warn, #a86a12)">⏳ Waiting for client to change</small><small v-if="a.payment">{{ a.payment.status === 'paid' ? 'Paid' : a.payment.status === 'in_review' ? 'Receipt to check' : 'Not paid' }}</small></td>
             <td class="row">
               <template v-if="canApprove && a.status === 'pending'">
                 <button v-if="!a.doctor" class="btn gold sm" @click="openAssign(a)">✨ Assign doctor</button>
@@ -284,27 +322,64 @@ const planTime = (p) => `${local(p.starts_at).time}–${local(p.ends_at).time}`
   <WalkIn v-if="walkIn" @close="walkIn = false" @booked="refresh" />
 
   <div v-if="checking" class="modal-bg" @click.self="checking = null">
-    <div class="modal" style="width: min(560px, 95vw)">
-      <h2>Schedule conflict</h2>
-      <p class="note">{{ checking.a.client?.name }} · {{ what(checking.a) }} · {{ checking.a.date }} at {{ checking.a.time }}</p>
-      <ul class="reasons" style="margin: 12px 0"><li v-for="c in checking.clashes" :key="c.kind + c.id" class="no">✕ {{ c.text }}</li></ul>
-      <h3 style="margin-top: 14px">{{ checking.a.doctor?.name }}’s day — classes & treatments</h3>
-      <table style="margin-top: 6px">
-        <tbody>
-          <tr v-for="p in checking.day_plan" :key="p.kind + p.id">
-            <td><b>{{ planTime(p) }}</b></td>
-            <td><span class="badge" :class="p.kind === 'class' ? 'pending' : 'approved'">{{ p.kind === 'class' ? 'Class' : 'Treatment' }}</span></td>
-            <td>{{ p.text }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <p class="note" style="margin-top: 10px">Pick another doctor, or decline and ask the client for a different time.</p>
-      <div class="row" style="justify-content: flex-end; margin-top: 16px">
-        <button class="btn ghost" @click="checking = null">Cancel</button>
+    <div class="modal" style="width: min(640px, 95vw); max-height: 92vh; overflow: auto">
+      <h2>{{ checking.clashes.length ? 'The doctor is busy' : checking.a.is_online ? 'Confirm this online session' : 'Approve this booking' }}</h2>
+      <div class="card" style="background: var(--bg); margin: 10px 0">
+        <b>{{ checking.a.client?.name }}</b> · {{ what(checking.a) }}
+        <p class="note">{{ fmtDay(checking.a.date) }} at <b>{{ checking.a.time }}</b> with <b>{{ checking.a.doctor?.name }}</b></p>
+      </div>
+
+      <div v-if="checking.change_request" class="flag warn">⏳ Waiting for the client to change — asked {{ new Date(checking.change_request.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }} by {{ checking.change_request.by }}.</div>
+      <ul v-if="checking.clashes.length" class="reasons" style="margin: 8px 0"><li v-for="c in checking.clashes" :key="c.kind + c.id" class="no">✕ {{ c.text }}</li></ul>
+      <div v-else class="flag ok">✓ {{ checking.a.doctor?.name }} is free at {{ checking.a.time }}.</div>
+      <div v-for="r in checking.same_time_requests" :key="r.id" class="flag warn">⚠ {{ r.client }} also asked for {{ checking.a.doctor?.name }} at {{ r.time }} ({{ r.service }}). If you approve this one, theirs will need another time or doctor.</div>
+
+      <h3 style="margin: 16px 0 6px">{{ checking.a.doctor?.name }} on {{ fmtDay(checking.a.date) }}</h3>
+      <div class="slots">
+        <div v-for="sl in checking.slots" :key="sl.time" class="slot" :class="[sl.state, { mine: sl.this_time }]" :title="sl.who ?? SLOT[sl.state]">
+          <b>{{ sl.time }}</b><small>{{ sl.this_time && sl.state !== 'this' ? 'Asked · ' + SLOT[sl.state] : SLOT[sl.state] }}</small><em v-if="sl.who">{{ sl.who }}</em>
+        </div>
+      </div>
+      <div class="slot-legend"><span class="free">Free</span><span class="this">This booking</span><span class="booked">Booked</span><span class="requested">Requested by another client</span><span class="class">Teaching a class</span></div>
+
+      <div class="row" style="justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; gap: 8px">
+        <button class="btn ghost" @click="checking = null">Close</button>
         <button class="btn danger" @click="decline(checking.a)">Decline</button>
-        <button class="btn gold" @click="reassign">✨ Choose another doctor</button>
+        <button class="btn ghost" @click="openChange()">✉ Ask client to change…</button>
+        <button class="btn ghost" @click="reassign">Choose another doctor</button>
+        <button class="btn gold" :disabled="checking.clashes.length > 0" :title="checking.clashes.length ? 'The doctor is busy at this time' : ''" @click="confirmApprove">{{ checking.a.is_online ? 'Confirm session' : 'Approve & notify' }}</button>
       </div>
     </div>
+  </div>
+
+  <div v-if="changing" class="modal-bg" style="z-index: 45" @click.self="changing = null">
+    <form class="modal" style="width: min(600px, 95vw); max-height: 92vh; overflow: auto" @submit.prevent="sendChange">
+      <h2>Ask {{ changing.a.client?.name }} to change</h2>
+      <p class="note">{{ what(changing.a) }} · {{ fmtDay(changing.a.date) }} at {{ changing.a.time }}{{ changing.a.doctor ? ' with ' + changing.a.doctor.name : '' }}. The client gets a notification and an SMS, then picks a new time or doctor in the app.</p>
+      <div class="seg" style="margin-top: 12px">
+        <button type="button" :class="{ on: changing.kind === 'time' }" @click="changing.kind = 'time'">Another time</button>
+        <button type="button" :class="{ on: changing.kind === 'doctor' }" @click="changing.kind = 'doctor'">Another doctor</button>
+        <button type="button" :class="{ on: changing.kind === 'either' }" @click="changing.kind = 'either'">Either</button>
+      </div>
+      <template v-if="changing.kind !== 'doctor'">
+        <h3 style="margin: 14px 0 6px">Suggest free times{{ changing.a.doctor ? ' with ' + changing.a.doctor.name : '' }}</h3>
+        <div class="pick">
+          <button v-for="t in changing.times" :key="t.date + t.time" type="button" :class="{ on: t.on }" @click="t.on = !t.on">{{ fmtDay(t.date) }} · {{ t.time }}</button>
+        </div>
+        <p v-if="!changing.times.length" class="note">No free times in the next few days — the client can still pick any free time in the app.</p>
+      </template>
+      <template v-if="changing.kind !== 'time'">
+        <h3 style="margin: 14px 0 6px">Suggest doctors free at {{ changing.a.time }}</h3>
+        <div class="pick">
+          <button v-for="d in changing.doctors" :key="d.id" type="button" :class="{ on: d.on }" @click="d.on = !d.on">{{ d.name }}</button>
+        </div>
+        <p v-if="!changing.doctors.length" class="note">No other doctor is free at that time.</p>
+      </template>
+      <label style="display: block; margin: 14px 0 4px; font-size: 13px">Message (optional)</label>
+      <input v-model="changing.message" maxlength="300" placeholder="e.g. Sorry — Dr. Meron is in surgery that morning." style="width: 100%" />
+      <p v-if="changing.error" class="note" style="color: var(--bad)">{{ changing.error }}</p>
+      <div class="row" style="justify-content: flex-end; margin-top: 16px"><button type="button" class="btn ghost" @click="changing = null">Cancel</button><button class="btn gold">Send to client</button></div>
+    </form>
   </div>
 
   <div v-if="assigning" class="modal-bg" @click.self="assigning = null">
@@ -335,9 +410,11 @@ const planTime = (p) => `${local(p.starts_at).time}–${local(p.ends_at).time}`
         </button>
       </div>
       <p v-if="!assigning.suggestions.length" class="note">No doctor offers this treatment yet — give a doctor portal access and the treatment in Staff.</p>
+      <p v-else-if="!assigning.suggestions.some((x) => x.available)" class="note" style="color: var(--bad)">No doctor is free at {{ assigning.a.time }}. Ask the client to choose another time.</p>
 
-      <div class="row" style="justify-content: flex-end; margin-top: 14px">
+      <div class="row" style="justify-content: flex-end; margin-top: 14px; gap: 8px">
         <button class="btn ghost" @click="assigning = null">Cancel</button>
+        <button class="btn ghost" @click="openChange(assigning)">✉ Ask client to change…</button>
       </div>
     </div>
   </div>
@@ -400,4 +477,33 @@ const planTime = (p) => `${local(p.starts_at).time}–${local(p.ends_at).time}`
 .ev.lesson { background: #fbf8f6; border-color: #efe6e0; cursor: default; }
 .ev.completed, .legend .completed { --c: #9aa3a3; }
 .ev.completed { opacity: .75; }
+.flag { margin: 8px 0; padding: 9px 12px; border-radius: 10px; font-size: 13px; }
+.flag.ok { background: #e6f3ef; color: var(--teal-deep); }
+.flag.warn { background: #fdf3e2; color: #8a5a12; }
+.slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+.slot { padding: 7px 8px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font-size: 12px; min-height: 52px; }
+.slot b { display: block; font-size: 13.5px; }
+.slot small { display: block; color: var(--muted); }
+.slot em { display: block; font-style: normal; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot.free { background: #f2faf7; border-color: #cfe9e0; }
+.slot.this { background: var(--dark); border-color: var(--dark); color: #fff; }
+.slot.this small, .slot.this em { color: rgba(255, 255, 255, .8); }
+.slot.booked { background: #fbeceb; border-color: #f0c9c4; }
+.slot.requested { background: #fdf3e2; border-color: #f0dcb5; }
+.slot.class { background: #efeaf7; border-color: #d9cff0; }
+.slot.past { opacity: .45; }
+.slot.mine:not(.this) { outline: 2px solid var(--bad); outline-offset: 1px; }
+.slot-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 11.5px; color: var(--muted); }
+.slot-legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; border: 1px solid var(--line); }
+.slot-legend .free::before { background: #f2faf7; }
+.slot-legend .this::before { background: var(--dark); }
+.slot-legend .booked::before { background: #fbeceb; }
+.slot-legend .requested::before { background: #fdf3e2; }
+.slot-legend .class::before { background: #efeaf7; }
+.seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: #f3f2f0; }
+.seg button { padding: 7px 14px; border: 0; border-radius: 9px; background: none; cursor: pointer; font-size: 13px; }
+.seg button.on { background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .1); color: var(--teal-deep); }
+.pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick button { padding: 7px 12px; border-radius: 99px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-size: 13px; }
+.pick button.on { background: var(--dark); border-color: var(--dark); color: #fff; }
 </style>

@@ -12,7 +12,7 @@ import { useAuth } from '../stores/auth'
 import { ask } from '../confirm'
 import { notify } from '../store'
 import { etb, day, when } from '../fmt'
-import { DESIGNS, barcodeSvg, printCards, cardsCsv } from '../giftcardPrint'
+import { DESIGNS, printCards, cardsCsv, cardFrontHtml, cardBackHtml, CARD_CSS } from '../giftcardPrint'
 import FilePicker from '../components/FilePicker.vue'
 import PhoneInput from '../components/PhoneInput.vue'
 import Pager from '../components/Pager.vue'
@@ -168,7 +168,9 @@ async function doVoid() {
   }
 }
 const popupBlocked = (ok) => ok || notify('Your browser blocked the print window — allow pop-ups for this site and try again.')
-const printShown = () => popupBlocked(printCards([{ code: shown.value.code, design: shown.value.card.design, value: shown.value.card.type === 'service' ? shown.value.card.service?.name : etb(shown.value.card.initial_value), label: shown.value.card.label, expires: day(shown.value.card.expires_at) }]))
+const cardFace = (card, code) => ({ code, to: card.recipient?.name ?? '', from: card.from ?? '', value: card.type === 'service' ? card.service?.name : etb(card.initial_value) })
+const printShown = () => popupBlocked(printCards([cardFace(shown.value.card, shown.value.code)]))
+const FRONT = cardFrontHtml()
 
 // ---- printed card stock (managers)
 const stock = ref(null)   // { mode: 'generate' | 'import', count, batch, design, text, error }
@@ -213,7 +215,7 @@ async function closeMade() {
     load()
   }
 }
-const printMade = () => popupBlocked(printCards(made.value.codes.map((code) => ({ code, design: made.value.design })), { title: made.value.batch }))
+const printMade = () => popupBlocked(printCards(made.value.codes.map((code) => ({ code })), { title: made.value.batch }))
 
 // ---- sell a printed card (scan → amount → payment)
 const physical = ref(null)
@@ -422,15 +424,14 @@ watch([status, q], () => (page.value = 1), { flush: 'sync' })
 
   <!-- Code shown once -->
   <div v-if="shown" class="modal-bg">
-    <div class="modal print-card" style="width: min(480px, 95vw); text-align: center">
+    <div class="modal print-card" style="width: min(480px, 95vw); text-align: center; max-height: 94vh; overflow: auto">
       <h2>{{ shown.reissued ? 'New card issued' : 'Gift card ready' }}</h2>
-      <div class="gcard big" :style="{ background: `linear-gradient(135deg, ${DESIGNS[shown.card.design]?.[0]}, ${DESIGNS[shown.card.design]?.[1]})` }">
-        <img src="/img/logo-white.png" alt="" />
-        <span class="v">{{ shown.card.type === 'service' ? shown.card.service?.name : etb(shown.card.balance) }}</span>
-        <span class="code">{{ shown.code }}</span>
-        <span class="bc" v-html="barcodeSvg(shown.code, { height: 34, width: 1.3 })"></span>
-        <span class="c">Valid until {{ day(shown.card.expires_at) }}</span>
+      <component :is="'style'">{{ CARD_CSS }}</component>
+      <div class="card-preview">
+        <div v-html="FRONT"></div>
+        <div v-html="cardBackHtml(cardFace(shown.card, shown.code))"></div>
       </div>
+      <p class="note" style="margin-top: 8px">Valid until {{ day(shown.card.expires_at) }}</p>
       <p class="note">This is the only time the full code is shown. {{ shown.card.delivery === 'print' ? 'Print it or write it on the card now.' : 'It was also sent to the recipient.' }}</p>
       <div class="row" style="justify-content: center; gap: 8px; margin-top: 12px"><button class="btn ghost" @click="printShown">🖨 Print card</button><button class="btn gold" @click="shown = null">Done</button></div>
     </div>
@@ -556,6 +557,8 @@ tr.click:hover td { background: #faf9f8; }
 .meter { width: 90px; height: 4px; border-radius: 99px; background: #eee; margin-top: 4px; overflow: hidden; }
 .meter i { display: block; height: 100%; background: var(--dark); }
 .gc-help { display: flex; align-items: center; font-size: 12.5px; }
+.card-preview { display: grid; gap: 10px; justify-items: center; margin: 12px 0 4px; }
+.card-preview :deep(.lv-card) { box-shadow: 0 10px 24px -14px rgba(0, 0, 0, .45); text-align: left; }
 .stat.click { cursor: pointer; }
 .stat.warn { border-color: #e7c99a; background: #fdf6ea; }
 .tabs .cnt { display: inline-block; min-width: 18px; margin-left: 6px; padding: 0 5px; border-radius: 99px; background: var(--gold, #b8956a); color: #fff; font-size: 11px; line-height: 18px; }
