@@ -26,7 +26,7 @@ const branches = ref([])
 async function search() {
   loadingList.value = true
   try {
-    const res = await api.get('/staff/rewards/members', { q: q.value || undefined, page: listPage.value, per_page: 20 })
+    const res = await api.get('/staff/rewards/members', { q: q.value || undefined, requests: showRequests.value ? 1 : undefined, page: listPage.value, per_page: 20 })
     list.value = res.data
     listMeta.value = res.meta
   } catch (e) {
@@ -55,6 +55,21 @@ onMounted(async () => {
 })
 
 const r = computed(() => profile.value?.rewards)
+
+// Clients who asked to join from the app: enrol them or decline with a reason they see.
+const showRequests = ref(false)
+function toggleRequests() { showRequests.value = !showRequests.value; q.value = ''; listPage.value = 1; search() }
+const declining = ref(null)
+async function declineRequest() {
+  const d = declining.value
+  if (d.reason.trim().length < 3) { d.error = 'Write a short reason — the client sees it.'; return }
+  try {
+    profile.value = (await api.post(`/staff/rewards/clients/${profile.value.client.id}/decline-request`, { reason: d.reason.trim() })).data
+    declining.value = null
+    notify('Request declined — the client was told')
+    search()
+  } catch (e) { d.error = e.message }
+}
 const tierColor = computed(() => TIER_COLORS[r.value?.tier?.key] ?? 'var(--dark)')
 const ICON = { earn: '＋', redeem: '−', expire: '⌛', adjust: '✎', reverse: '↺' }
 const REQ = { pending: ['New', 'new'], forwarded: ['With e-commerce', 'pending'], completed: ['Done', 'paid'], rejected: ['Not approved', 'declined'], cancelled: ['Cancelled', 'cancelled'] }
@@ -129,11 +144,14 @@ const listMeta = ref({})
   <div class="rc">
     <aside class="card rc-list">
       <button v-if="auth.can('rewards.enroll')" class="btn gold" style="width: 100%; margin-bottom: 10px" @click="openEnrol">+ Enrol a client</button>
+      <button v-if="auth.can('rewards.enroll') && (listMeta.join_requests || showRequests)" class="req-toggle" :class="{ on: showRequests }" @click="toggleRequests">
+        {{ showRequests ? '← Back to members' : `✋ ${listMeta.join_requests} asked to join in the app` }}
+      </button>
       <input v-model="q" class="search-in" placeholder="Search any client by name or phone…" />
-      <p class="note" style="margin: 8px 2px">{{ q ? 'All clients (members and not)' : 'Members by points (last 12 months)' }}</p>
+      <p class="note" style="margin: 8px 2px">{{ showRequests ? 'Asked to join from the app — open one to enrol or decline' : q ? 'All clients (members and not)' : 'Members by points (last 12 months)' }}</p>
       <button v-for="m in list" :key="m.client.id" class="rc-row" :class="{ on: selected === m.client.id }" @click="open(m.client.id)">
         <span class="dot" :style="{ background: TIER_COLORS[m.tier?.key] ?? '#d9d6d2' }"></span>
-        <span class="grow"><b>{{ m.client.name }}</b><small>{{ m.member ? m.tier?.name : 'Not a member' }} · {{ m.client.phone }}</small></span>
+        <span class="grow"><b>{{ m.client.name }}</b><small>{{ m.member ? m.tier?.name : m.requested_at ? 'Asked to join' : 'Not a member' }} · {{ m.client.phone }}</small><small v-if="m.request_note" class="rq">“{{ m.request_note }}”</small></span>
         <span class="p">{{ m.member ? m.points_balance.toLocaleString() : '—' }}</span>
       </button>
       <p v-if="!loadingList && !list.length" class="empty">{{ q ? 'No clients found' : 'No members yet — enrol clients who ask to join' }}</p>
@@ -144,6 +162,14 @@ const listMeta = ref({})
       <p v-if="error" class="err">{{ error }}</p>
       <div v-if="!profile && selected" class="card note">Loading…</div>
       <template v-if="profile">
+        <div v-if="profile.join_request" class="card join-req">
+          <div class="grow"><b>✋ {{ profile.client.name }} asked to join Lavish Rewards in the app</b>
+            <small>{{ when(profile.join_request.at) }}<template v-if="profile.join_request.note"> · “{{ profile.join_request.note }}”</template></small></div>
+          <template v-if="auth.can('rewards.enroll')">
+            <button class="btn ghost sm" @click="declining = { reason: '', error: '' }">Decline…</button>
+            <button class="btn gold sm" @click="join">Enrol</button>
+          </template>
+        </div>
         <div class="card rc-hero" :style="{ '--tc': tierColor }">
           <div class="who">
             <span class="eyebrow">{{ r.member ? (r.tier?.name ?? '').toUpperCase() + ' MEMBER' : 'NOT A MEMBER YET' }}</span>
@@ -247,6 +273,16 @@ const listMeta = ref({})
     </form>
   </div>
 
+  <div v-if="declining" class="modal-bg" @click.self="declining = null">
+    <form class="modal" @submit.prevent="declineRequest">
+      <h2>Decline {{ profile.client.name }}’s request?</h2>
+      <p class="note">The client sees this reason in the app and can ask again later.</p>
+      <input v-model="declining.reason" required minlength="3" maxlength="255" placeholder="e.g. Please join at your next visit so we can confirm your details" style="margin-top: 12px" />
+      <p v-if="declining.error" class="err">{{ declining.error }}</p>
+      <div class="row" style="justify-content: flex-end; margin-top: 14px"><button type="button" class="btn ghost" @click="declining = null">Cancel</button><button class="btn danger">Decline</button></div>
+    </form>
+  </div>
+
   <div v-if="adjusting" class="modal-bg" @click.self="adjusting = null">
     <form class="modal" @submit.prevent="saveAdjust">
       <h2>Adjust points</h2>
@@ -288,6 +324,11 @@ const listMeta = ref({})
 .rc-hero .bal span { font-size: 12.5px; opacity: .85; }
 .rc-hero .bal .held { display: block; margin-top: 4px; font-size: 11.5px; }
 .amt { text-align: right; }
+.req-toggle { width: 100%; margin-bottom: 10px; padding: 9px 12px; border-radius: 10px; border: 1px solid #f0dcb5; background: #fdf3e2; color: #8a5a12; font-weight: 500; cursor: pointer; text-align: left; }
+.req-toggle.on { background: #fff; border-color: var(--line); color: var(--ink); }
+.rc-row .rq { color: #8a5a12; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.join-req { display: flex; align-items: center; gap: 10px; background: #fdf3e2; border-color: #f0dcb5; }
+.join-req small { display: block; color: #8a5a12; margin-top: 2px; }
 .amt small { display: block; color: var(--muted); font-size: 11.5px; }
 .seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: #f3f2f0; margin-top: 8px; }
 .seg button { padding: 7px 14px; border: 0; border-radius: 9px; background: none; cursor: pointer; font-size: 13px; }

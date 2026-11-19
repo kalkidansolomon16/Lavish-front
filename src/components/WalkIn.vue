@@ -9,6 +9,13 @@ import { etb } from '../fmt'
 import PhoneInput from './PhoneInput.vue'
 
 const emit = defineEmits(['close', 'booked'])
+// The client still owes for a finished treatment: only staff who collect payments may go ahead anyway.
+async function overrideOwed(e) {
+  if (e.code !== 'client_owes') return false
+  if (!e.details?.can_override) { notify(e.message); return false }
+  return ask({ title: 'This client hasn’t paid for their last treatment', body: `${e.message}\n\nGo ahead anyway (for example, they are paying now at the desk)?`, ok: 'Go ahead', tone: 'danger' })
+}
+
 const tomorrow = new Date(Date.now() + 864e5).toISOString().slice(0, 10)
 
 const step = ref(1)
@@ -76,14 +83,20 @@ async function book() {
   if (!(await ask({ title: 'Book this appointment?', body: `${name.value} · ${service.value.name}\n${appt.value.date} at ${appt.value.time} with ${doctor.value.name}${sms.value ? '\nAn SMS confirmation will be sent.' : ''}`, ok: 'Book' }))) return
   busy.value = true
   error.value = ''
-  try {
-    await api.post('/staff/appointments/walk-in', {
+  const send = (extra = {}) => api.post('/staff/appointments/walk-in', {
       ...(picked.value ? { client_id: picked.value.id } : { client: { name: client.value.name.trim(), phone: client.value.phone, gender: client.value.gender } }),
       source: SOURCE[h.value.source] ?? 'walk_in',
       history: h.value,
       service_id: appt.value.service_id, doctor_id: appt.value.doctor_id, branch_id: appt.value.branch_id,
-      date: appt.value.date, time: appt.value.time, send_sms: sms.value, send_app_invite: invite.value,
+      date: appt.value.date, time: appt.value.time, send_sms: sms.value, send_app_invite: invite.value, ...extra,
     })
+  try {
+    try {
+      await send()
+    } catch (e) {
+      if (!(await overrideOwed(e))) throw e
+      await send({ allow_unpaid: true })
+    }
     notify(`${name.value} is booked — ${doctor.value.name} was notified`)
     emit('booked')
     emit('close')

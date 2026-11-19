@@ -50,9 +50,18 @@ http.interceptors.response.use(
     done(res.config)
     return res
   },
-  (err) => {
+  async (err) => {
     done(err.config)
     const res = err.response
+    // Some networks / servers drop a share of new connections: reload data (GET) up to twice before giving up.
+    // Saves (POST/PATCH/…) are never repeated automatically — they might have reached the server.
+    const cfg = err.config
+    if (!res && cfg && cfg.method === 'get' && (cfg._retries ?? 0) < 2) {
+      cfg._retries = (cfg._retries ?? 0) + 1
+      cfg._counted = false
+      await new Promise((r) => setTimeout(r, 500 * cfg._retries))
+      return http.request(cfg)
+    }
     if (!res) {
       return Promise.reject(new ApiError({ status: 0, code: 'network', message: 'Can’t reach the Lavish server. Check your connection.' }))
     }

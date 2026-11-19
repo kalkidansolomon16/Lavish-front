@@ -6,7 +6,7 @@ import { state } from './store'
 import { ui, t } from './ui'
 import { useAuth } from './stores/auth'
 import { useNotifications } from './stores/notifications'
-import { loading } from './api/http'
+import { loading, api } from './api/http'
 import Topbar from './components/Topbar.vue'
 import ClientDrawer from './components/ClientDrawer.vue'
 import CommandPalette from './components/CommandPalette.vue'
@@ -36,6 +36,20 @@ watch(inside, (on) => {
   else { notifications.stop(); router.push('/login') }
 }, { immediate: true })
 
+// Clients who finished a treatment and haven't paid: a bar on every page for staff who collect payments,
+// so nobody leaves without paying. Checked every minute.
+const owing = ref({ count: 0, today: 0, total: 0 })
+let owingTimer
+async function checkOwing() {
+  if (!inside.value || !auth.can('payments.collect')) return (owing.value = { count: 0, today: 0, total: 0 })
+  try { owing.value = (await api.get('/staff/payments/owing', {}, { background: true })).meta } catch { /* keep the last value */ }
+}
+watch(inside, (on) => {
+  clearInterval(owingTimer)
+  if (on) { checkOwing(); owingTimer = setInterval(checkOwing, 60000) }
+}, { immediate: true })
+router.afterEach((to) => { if (to.path === '/payments') checkOwing() })
+
 const hotkey = (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && inside.value) {
     e.preventDefault()
@@ -43,7 +57,7 @@ const hotkey = (e) => {
   }
 }
 onMounted(() => window.addEventListener('keydown', hotkey))
-onBeforeUnmount(() => window.removeEventListener('keydown', hotkey))
+onBeforeUnmount(() => { window.removeEventListener('keydown', hotkey); clearInterval(owingTimer) })
 </script>
 
 <template>
@@ -61,6 +75,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', hotkey))
     </aside>
     <main class="main">
       <Topbar />
+      <RouterLink v-if="owing.count" to="/payments?tab=owing" class="owing-bar">
+        <span class="ic">!</span>
+        <span><b>{{ owing.count }} finished treatment{{ owing.count === 1 ? '' : 's' }} / delivered order{{ owing.count === 1 ? '' : 's' }} not paid</b> · ETB {{ Number(owing.total).toLocaleString() }}{{ owing.today ? ` · ${owing.today} today` : '' }} — collect before they leave</span>
+        <span class="go">View & collect →</span>
+      </RouterLink>
       <RouterView :key="state.user?.id" />
     </main>
     <ClientDrawer />
@@ -70,3 +89,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', hotkey))
   <div v-if="state.toast" class="toast">{{ state.toast }}</div>
   <ConfirmDialog />
 </template>
+
+<style>
+.owing-bar { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; padding: 11px 14px; border-radius: 12px; background: #fdf0e6; border: 1px solid #f1cdb0; color: #8a4b12; font-size: 13.5px; text-decoration: none; }
+.owing-bar .ic { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #c86a1e; color: #fff; font-weight: 700; flex: none; }
+.owing-bar .go { margin-left: auto; font-weight: 600; white-space: nowrap; }
+</style>
