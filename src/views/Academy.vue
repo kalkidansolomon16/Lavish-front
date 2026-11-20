@@ -57,6 +57,27 @@ async function saveCourse() {
     notify(e.message)
   }
 }
+// The course session has ended: close it (students → completed for certificates, no new enrolments)
+async function closeCourse(c) {
+  const active = c.enrollments_count ?? 0
+  if (!(await ask({ title: `Close “${c.title}”?`, body: `Do this when the course session has ended.
+• Enrolled students are marked completed (you can then issue their certificates) and told in the app.
+• No new students can be enrolled and it leaves the app’s catalogue.
+${active} student(s) in this course.`, ok: 'Close course', tone: 'danger' }))) return
+  try {
+    const res = await api.post(`/staff/academy/courses/${c.id}/close`)
+    notify(`Course closed — ${res.meta.students_completed} student(s) completed`)
+    load()
+  } catch (e) { notify(e.message) }
+}
+async function reopenCourse(c) {
+  if (!(await ask({ title: `Reopen “${c.title}”?`, body: 'New students can be enrolled again. Students already completed stay completed. Turn “Shown in the app” on again under Edit if needed.', ok: 'Reopen' }))) return
+  try {
+    await api.post(`/staff/academy/courses/${c.id}/reopen`)
+    notify('Course reopened')
+    load()
+  } catch (e) { notify(e.message) }
+}
 async function addModule(c) {
   const t = (newModule.value[c.id] || '').trim()
   if (!t) return
@@ -173,7 +194,9 @@ const print = () => window.print()
     <div v-for="c in courses" :key="c.id" class="card" :style="{ opacity: c.active ? 1 : 0.6 }">
       <div class="row" style="justify-content: space-between; align-items: flex-start">
         <div><h2>{{ c.title }}</h2><p class="note">{{ c.level }} · {{ c.weeks }} weeks · {{ etb(c.price) }}<template v-if="c.mode"> · {{ c.mode }}</template><template v-if="c.starts_on"> · starts {{ day(c.starts_on) }}</template> · {{ c.enrollments_count ?? 0 }} enrolled</p></div>
-        <div class="row"><span class="badge">{{ (c.modules ?? []).filter((m) => m.published).length }}/{{ (c.modules ?? []).length }} live</span><button v-if="canPaths" class="btn ghost sm" @click="openCourse(c)">Edit</button></div>
+        <div class="row"><span v-if="c.closed_at" class="badge declined">Closed {{ day(c.closed_at) }}</span><span class="badge">{{ (c.modules ?? []).filter((m) => m.published).length }}/{{ (c.modules ?? []).length }} live</span><button v-if="canPaths" class="btn ghost sm" @click="openCourse(c)">Edit</button>
+          <button v-if="canPaths && !c.closed_at" class="btn ghost sm danger-t" @click="closeCourse(c)">Close course</button>
+          <button v-if="canPaths && c.closed_at" class="btn ghost sm" @click="reopenCourse(c)">Reopen</button></div>
       </div>
       <label>Teacher doctors (have access to the Academy teacher portal)</label>
       <div class="row">
@@ -192,8 +215,8 @@ const print = () => window.print()
         <span class="badge" :class="m.published ? 'active' : 'pending'">{{ m.published ? 'live' : 'draft' }}</span>
         <button v-if="canPaths" class="btn ghost sm" title="Remove" @click="removeModule(m)">✕</button>
       </div>
-      <p v-if="canPaths && (c.modules?.length ?? 0) >= 5" class="note" style="margin-top: 12px">All 5 weeks have a module.</p>
-      <form v-if="canPaths && (c.modules?.length ?? 0) < 5" class="row" style="margin-top: 12px; flex-wrap: nowrap" @submit.prevent="addModule(c)">
+      <p v-if="canPaths && (c.modules?.length ?? 0) >= c.weeks" class="note" style="margin-top: 12px">Every week has a module. Adding another makes the course one week longer.</p>
+      <form v-if="canPaths && !c.closed_at" class="row" style="margin-top: 12px; flex-wrap: nowrap" @submit.prevent="addModule(c)">
         <input v-model="newModule[c.id]" placeholder="Add a module to this path…" />
         <button class="btn gold sm">Add</button>
       </form>
@@ -251,7 +274,7 @@ const print = () => window.print()
       <label>Title</label><input v-model="courseForm.title" required placeholder="e.g. Medical Aesthetics Foundations" />
       <div class="qgrid">
         <div><label>Level</label><select v-model="courseForm.level"><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select></div>
-        <div><label>Length</label><input value="5 weeks · one module per week" disabled /></div>
+        <div><label>Length (weeks)</label><input v-model.number="courseForm.weeks" type="number" min="1" max="52" required /></div>
         <div><label>Fee (ETB)</label><input v-model.number="courseForm.price" type="number" min="0" required /></div>
         <div><label>Starts on</label><input v-model="courseForm.starts_on" type="date" /></div>
         <div><label>Mode</label><input v-model="courseForm.mode" placeholder="e.g. In person · Addis Ababa" /></div>
@@ -334,4 +357,5 @@ const print = () => window.print()
 td small { display: block; color: var(--muted); font-size: 12px; }
 label { display: block; font-size: 13px; margin: 10px 0 4px; }
 textarea { width: 100%; }
+.danger-t { color: var(--bad); border-color: #ecc8c3; }
 </style>

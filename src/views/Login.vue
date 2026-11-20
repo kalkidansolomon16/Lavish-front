@@ -56,11 +56,11 @@ const input = 'w-full rounded-input border border-white/15 bg-white/95 px-4 py-3
 // ───────────────────────── Hero (visual only) ─────────────────────────
 const reduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
+// The staff portal's welcome: about the TEAM — unity, productivity, satisfaction (not the public website).
 const headline = [
-  { w: 'Ultra' }, { w: 'Luxury' }, { w: 'in', br: true },
-  { w: 'Science', gold: true }, { w: '&', gold: true }, { w: 'Beauty.', gold: true },
+  { w: 'One' }, { w: 'Team,', br: true },
+  { w: 'One', gold: true }, { w: 'Standard', gold: true }, { w: 'of', gold: true }, { w: 'Care.', gold: true },
 ]
-// Wording, services and addresses follow lavishmedicalspa.com
 // Headline split into its two lines, keeping one running index for the stagger
 const headlineLines = headline.reduce((lines, w, i) => {
   lines[lines.length - 1].push({ ...w, i })
@@ -69,28 +69,28 @@ const headlineLines = headline.reduce((lines, w, i) => {
 }, [[]])
 const stats = [
   { to: 3, suffix: '', label: 'Branches' },
-  { to: 6, suffix: '', label: 'Specialties' },
-  { to: 8, suffix: '', label: 'Signature treatments' },
+  { to: 7, suffix: '', label: 'Roles, one team' },
+  { to: 100, suffix: '%', label: 'Client focus' },
 ]
 const counts = ref(stats.map((s) => (reduced ? s.to : 0)))
-const treatments = ['Signature HydraFacial', 'Botox & Dermal Fillers', 'HIFU Face & Neck Lift', 'PRP Skin Rejuvenation', 'Morpheus8 & Microneedling', 'Hair Restoration Solutions', 'Body Contouring & Skin Tightening', 'Advanced Dermatology Treatments']
+const treatments = ['Unity', 'Productivity', 'Satisfaction', 'Teamwork', 'Respect', 'Excellence', 'Care', 'Growth']
 const pillars = [
-  { ic: '✚', t: 'Premium Dermatology' },
-  { ic: '✦', t: 'Aesthetic' },
-  { ic: '❀', t: 'Sexual Wellness' },
-  { ic: '◈', t: 'Body Transformation' },
-  { ic: '❦', t: 'Hair Transplant' },
-  { ic: '☾', t: 'Massage Therapy' },
+  { ic: '✚', t: 'Doctors & Nurses' },
+  { ic: '☏', t: 'Reception' },
+  { ic: '◈', t: 'E-commerce & Delivery' },
+  { ic: '✎', t: 'Lavish Academy' },
+  { ic: '✦', t: 'Management' },
+  { ic: '❀', t: 'Client Care' },
 ]
 const haven = [
-  { t: 'Wellness', d: 'Care that starts with healthy skin and a calm mind.' },
-  { t: 'Beauty', d: 'World-class aesthetics, planned by licensed doctors.' },
-  { t: 'Confidence', d: 'Results our clients carry with them every day.' },
+  { t: 'Unity', d: 'Doctors, nurses, reception, the shop and the academy share one calendar, one client record and one goal.' },
+  { t: 'Productivity', d: 'Bookings, payments, orders and prescriptions reach the right person at once — no paper, no waiting.' },
+  { t: 'Satisfaction', d: 'Happy clients and a proud team: every visit is followed up until the result is exactly right.' },
 ]
 const journey = [
-  { t: 'Consult', d: 'A private conversation with a licensed doctor about the goals and the science behind them.' },
-  { t: 'Treat', d: 'Calm rooms, proven technology and a team that knows every client by name.' },
-  { t: 'Follow up', d: 'Aftercare, prescriptions and check-ins until the result is exactly right.' },
+  { t: 'Welcome', d: 'Reception books the visit, checks the doctor’s day and greets every client by name.' },
+  { t: 'Treat', d: 'Doctors and nurses treat, record the history and prescribe — all in the same place.' },
+  { t: 'Follow up', d: 'Payments, aftercare deliveries, rewards and messages close the loop for a happy client.' },
 ]
 const cities = [
   { name: 'Addis Ababa', note: 'Bole, Adorsam Apartments, 5th floor', x: 90, y: 128 },
@@ -234,13 +234,13 @@ onBeforeUnmount(() => {
       <section class="first">
         <div class="photo" aria-hidden="true"><img src="/img/clinic-reception.jpg" alt="" /></div>
         <div class="copy">
-          <span class="eyebrow fade" style="--d: .1s"><i></i>WELCOME TO LAVISH MEDICAL SPA</span>
+          <span class="eyebrow fade" style="--d: .1s"><i></i>THE LAVISH TEAM PORTAL</span>
           <h1 class="title">
             <span v-for="(line, l) in headlineLines" :key="l" class="hl">
               <span v-for="w in line" :key="w.i" class="word" :class="{ gold: w.gold }" :style="{ '--i': w.i }">{{ w.w }}</span>
             </span>
           </h1>
-          <p class="lead fade" style="--d: 1s">Experience <b>world-class aesthetics</b> right here at home. This is the staff portal for the team that makes it happen.</p>
+          <p class="lead fade" style="--d: 1s">Doctors, nurses, reception, e-commerce and the academy — <b>working as one</b>. Everything the team needs for the day, in one place.</p>
 
           <div class="stats fade" style="--d: 1.25s">
             <div v-for="(s, i) in stats" :key="s.label" class="stat">
@@ -249,7 +249,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <span class="badge fade" style="--d: 1.6s"><i></i>Bole · Addis Ababa</span>
+        <span class="badge fade" style="--d: 1.6s"><i></i>Addis Ababa · Adama · Dire Dawa</span>
 
         <button class="cue" :class="{ gone: scrolled }" @click="explore">
           <span class="mouse"><i></i></span>Scroll to explore
@@ -264,10 +264,10 @@ onBeforeUnmount(() => {
         </div>
 
         <section class="sec">
-          <span class="eyebrow reveal"><i></i>A HAVEN OF TRANQUILITY</span>
-          <h2 class="h reveal">Allow your body, mind and soul <em>sense a haven of tranquility.</em></h2>
+          <span class="eyebrow reveal"><i></i>OUR VALUES</span>
+          <h2 class="h reveal">Three things that make us <em>one Lavish team.</em></h2>
           <div class="haven">
-            <div class="frame reveal"><img src="/img/clinic-reception.jpg" alt="The Lavish reception in Bole, Addis Ababa" loading="lazy" /></div>
+            <div class="frame reveal"><img src="/img/clinic-reception.jpg" alt="The Lavish team’s reception in Bole, Addis Ababa" loading="lazy" /></div>
             <ul class="trio">
               <li v-for="(h, i) in haven" :key="h.t" class="reveal" :style="{ '--d': i * 0.12 + 's' }"><strong>{{ h.t }}</strong><span>{{ h.d }}</span></li>
             </ul>
@@ -275,8 +275,8 @@ onBeforeUnmount(() => {
         </section>
 
         <section class="sec">
-          <span class="eyebrow reveal"><i></i>OUR SERVICES</span>
-          <h2 class="h reveal">The best of <em>our services.</em></h2>
+          <span class="eyebrow reveal"><i></i>ONE TEAM, MANY HANDS</span>
+          <h2 class="h reveal">Every role, <em>working together.</em></h2>
           <div class="cards">
             <article v-for="(p, i) in pillars" :key="p.t" class="card reveal" :style="{ '--d': (i % 3) * 0.1 + 's' }" @mousemove="tilt" @mouseleave="untilt">
               <div class="glare"></div>
@@ -287,8 +287,8 @@ onBeforeUnmount(() => {
           </div>
         </section>
         <section class="sec journey" :style="{ '--jp': jp }">
-          <span class="eyebrow reveal"><i></i>THE LAVISH JOURNEY</span>
-          <h2 class="h reveal">From first hello <em>to final result.</em></h2>
+          <span class="eyebrow reveal"><i></i>HOW WE WORK</span>
+          <h2 class="h reveal">From first hello <em>to a happy client.</em></h2>
           <ol class="steps">
             <span class="line"><span class="fill"></span></span>
             <li v-for="(s, i) in journey" :key="s.t" class="step reveal" :class="{ lit: jp > (i + 0.35) / 3 }">
@@ -300,7 +300,7 @@ onBeforeUnmount(() => {
 
         <section class="sec">
           <span class="eyebrow reveal"><i></i>OUR BRANCHES</span>
-          <h2 class="h reveal">One standard of care, <em>three cities.</em></h2>
+          <h2 class="h reveal">Three cities, <em>one team.</em></h2>
           <div class="map reveal">
             <svg viewBox="0 0 600 220" aria-hidden="true">
               <defs>
@@ -358,8 +358,8 @@ onBeforeUnmount(() => {
             <circle r="70" fill="url(#lxCore)" class="core" />
             <circle r="16" class="seed" />
           </svg>
-          <span class="eyebrow"><i></i>WHAT ARE YOU WAITING FOR…</span>
-          <q>Elevating the standards of dermatology <em>and aesthetics in Ethiopia.</em></q>
+          <span class="eyebrow"><i></i>TOGETHER</span>
+          <q>Great care is a team effort — <em>thank you for being part of it.</em></q>
           <button class="cta" @click="focusSignIn">Sign in to the portal <span>→</span></button>
         </section>
       </div>

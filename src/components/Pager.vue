@@ -10,7 +10,8 @@ const emit = defineEmits(['go'])
 const cur = computed(() => props.meta?.current_page ?? 1)
 const last = computed(() => props.meta?.last_page ?? 1)
 const total = computed(() => props.meta?.total ?? 0)
-const per = computed(() => props.meta?.per_page ?? 0)
+// Lists whose meta has no per_page: on a single page everything is shown.
+const per = computed(() => props.meta?.per_page ?? (last.value <= 1 ? total.value : 0))
 const from = computed(() => (total.value ? (cur.value - 1) * per.value + 1 : 0))
 const to = computed(() => Math.min(total.value, cur.value * per.value))
 
