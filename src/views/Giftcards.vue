@@ -12,10 +12,11 @@ import { useAuth } from '../stores/auth'
 import { ask } from '../confirm'
 import { notify } from '../store'
 import { etb, day, when } from '../fmt'
-import { DESIGNS, printCards, cardsCsv, cardFrontHtml, cardBackHtml, CARD_CSS } from '../giftcardPrint'
+import { DESIGNS, printCards, cardFrontHtml, cardBackHtml, CARD_CSS, barcodeSvg, qrSvg, grouped, saveCards } from '../giftcardPrint'
 import FilePicker from '../components/FilePicker.vue'
 import PhoneInput from '../components/PhoneInput.vue'
 import Pager from '../components/Pager.vue'
+import CameraScanner from '../components/CameraScanner.vue'
 
 const auth = useAuth()
 const route = useRoute()
@@ -32,10 +33,13 @@ const voiding = ref(null)
 const services = ref([])
 const clients = ref([])
 
-const STATUS = { awaiting_activation: 'To activate', active: 'Active', redeemed: 'Used up', expired: 'Expired', void: 'Voided', pending_payment: 'Awaiting payment', in_stock: 'Card stock' }
+const STATUS = { awaiting_activation: 'To activate', active: 'Active', redeemed: 'Used up', expired: 'Expired', void: 'Voided', pending_payment: 'Awaiting payment', in_stock: 'Not sold yet' }
 const BADGE = { active: 'paid', redeemed: 'completed', expired: 'declined', void: 'declined', pending_payment: 'pending', awaiting_activation: 'approved', in_stock: 'pending' }
 const SOURCE = { app: 'Bought in the app', front_desk: 'Front desk', promo: 'Promotion', card_stock: 'Printed card' }
-const tabs = computed(() => [...(auth.can('giftcards.activate') ? ['awaiting_activation'] : []), 'active', 'pending_payment', 'redeemed', 'expired', 'void', ...(auth.can('giftcards.sell', 'giftcards.stock') ? ['in_stock'] : []), ''])
+const tabs = computed(() => [...(auth.can('giftcards.activate') ? ['awaiting_activation'] : []), 'active', 'redeemed', 'expired', 'void', ''])
+// "Active" lists the cards in use and the printed cards ready to be sold.
+// "To activate" = e-gift cards bought in the app that are waiting for payment or for activation.
+const statusParam = (s) => ({ active: 'active,in_stock', awaiting_activation: 'awaiting_activation,pending_payment' })[s] ?? (s || undefined)
 const count = (s) => meta.value.counts?.[s] ?? 0
 const pct = (c) => (c.initial_value ? (c.balance / c.initial_value) * 100 : 0)
 const LEDGER = { issue: 'Issued', redeem: 'Spent', restore: 'Returned (booking cancelled / refunded)', void: 'Voided', reissue: 'Reissued', expire: 'Expired', adjust: 'Adjusted' }
@@ -43,7 +47,7 @@ const LEDGER = { issue: 'Issued', redeem: 'Spent', restore: 'Returned (booking c
 async function load() {
   error.value = ''
   try {
-    const res = await api.get('/staff/gift-cards', { status: status.value || undefined, q: q.value || undefined, page: page.value, per_page: 30 })
+    const res = await api.get('/staff/gift-cards', { status: statusParam(status.value), q: q.value || undefined, page: page.value, per_page: 10 })
     rows.value = res.data
     meta.value = res.meta
   } catch (e) {
@@ -83,6 +87,16 @@ async function activate() {
   } catch (e) {
     activating.value = { ...(activating.value ?? {}), error: e.message }
   }
+}
+
+// ---- send the "your gift card is activated" message again
+async function resend() {
+  const c = detail.value
+  if (!(await ask({ title: 'Send the message again?', body: `To ${[c.recipient.email, c.recipient.phone].filter(Boolean).join(' and ')}: “Your Lavish gift card is activated…” with the card number and the dates it can be used.`, ok: 'Send' }))) return
+  try {
+    detail.value = (await api.post(`/staff/gift-cards/${c.id}/resend`)).data
+    notify('Message sent again')
+  } catch (e) { notify(e.message) }
 }
 
 // ---- use the card at the visit
@@ -172,57 +186,67 @@ const cardFace = (card, code) => ({ code, to: card.recipient?.name ?? '', from: 
 const printShown = () => popupBlocked(printCards([cardFace(shown.value.card, shown.value.code)]))
 const FRONT = cardFrontHtml()
 
-// ---- printed card stock (managers)
-const stock = ref(null)   // { mode: 'generate' | 'import', count, batch, design, text, error }
-const made = ref(null)    // { batch, codes } — numbers shown once, for the printer
-const openStock = () => (stock.value = { mode: 'generate', count: 50, batch: '', design: 'classic', text: '', error: '' })
+// ---- printed gift cards (managers): make a batch → saved to a folder on the PC / tablet → print from the file
+const stock = ref(null)   // { mode: 'generate' | 'import', count, batch, text, error, busy }
+const openStock = () => (stock.value = { mode: 'generate', count: 50, batch: '', text: '', error: '', busy: false })
 function readFile(f) {
   stock.value.file = f
   if (f) f.text().then((t) => (stock.value.text = t))
 }
-const importCodes = (t) => [...new Set((t.match(/[A-Za-z0-9][A-Za-z0-9-]{8,}[A-Za-z0-9]/g) ?? []).filter((x) => x.replace(/-/g, '').length >= 10 && !/^(batch|card_number|barcode)/i.test(x)))]
+const importCodes = (t) => [...new Set((t.match(/[A-Za-z0-9][A-Za-z0-9-]{8,}[A-Za-z0-9]/g) ?? []).filter((x) => x.replace(/-/g, '').length >= 10 && !/^(batch|card_number|barcode|qr)/i.test(x)))]
 async function saveStock() {
   const s = stock.value
   s.error = ''
   if (s.mode === 'generate') {
-    if (!(await ask({ title: `Create ${s.count} printed cards?`, body: `Batch: ${s.batch || 'named by today’s date'}
-The cards have no value until they are sold at the desk.
-You get the numbers once — download them for the printer straight away.`, ok: 'Create cards' }))) return
+    if (!(await ask({ title: `Make ${s.count} printed gift cards?`, body: `Batch: ${s.batch || 'named by today’s date'}
+Next you choose a folder on this computer: the cards (with their barcodes and QR codes) are saved there as a file you can open and print any time.
+The cards have no value until they are sold at the desk.`, ok: 'Make & save cards' }))) return
+    // Make the cards, then save the print file as a normal download (works in every browser; Chrome can be set to
+    // ask which folder to save in).
+    const batch = s.batch.trim() || `Batch ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`
+    s.busy = true
     try {
-      const res = await api.post('/staff/gift-cards/stock/generate', { count: s.count, batch: s.batch || null, design: s.design })
+      const res = (await api.post('/staff/gift-cards/stock/generate', { count: s.count, batch })).data
+      const saved = await saveCards(res.codes, res.batch)
       stock.value = null
-      made.value = { ...res.data, design: s.design }
+      savedInfo.value = { ...saved, count: res.codes.length, batch: res.batch }
+      status.value = 'active'
       load()
-    } catch (e) { s.error = e.message }
+    } catch (e) { s.error = e.message } finally { if (stock.value) s.busy = false }
   } else {
     const codes = importCodes(s.text)
     if (!codes.length) { s.error = 'No card numbers found — paste one number per line (at least 10 letters/digits).'; return }
     if (!(await ask({ title: `Add ${codes.length} printed card${codes.length === 1 ? '' : 's'}?`, body: `Batch: ${s.batch || 'named by today’s date'}
 First: ${codes[0]}${codes.length > 1 ? '\nLast: ' + codes[codes.length - 1] : ''}`, ok: 'Add cards' }))) return
     try {
-      const r = (await api.post('/staff/gift-cards/stock/import', { codes, batch: s.batch || null, design: s.design })).data
+      const r = (await api.post('/staff/gift-cards/stock/import', { codes, batch: s.batch || null })).data
       stock.value = null
       notify(`${r.added} cards added to ${r.batch}${r.skipped.length ? ` · ${r.skipped.length} skipped (already added or too short)` : ''}`)
-      status.value = 'in_stock'
+      status.value = 'active'
       load()
     } catch (e) { s.error = e.message }
   }
 }
-async function closeMade() {
-  if (await ask({ title: 'Close?', body: 'You won’t be able to see these numbers again. Did you download or print them?', ok: 'Yes, close' })) {
-    made.value = null
-    status.value = 'in_stock'
-    load()
-  }
+// Save a batch's print file again (any time) — folder first, then the numbers from the server.
+const savedInfo = ref(null) // { folder?, downloaded?, file, count, batch }
+async function saveBatch(b) {
+  try {
+    const res = await api.get('/staff/gift-cards/stock/batch-codes', { batch: b.batch })
+    if (!res.data.codes.length) { notify('These cards were made before card numbers were kept, so they can’t be saved again.'); return }
+    const saved = await saveCards(res.data.codes, b.batch)
+    savedInfo.value = { ...saved, count: res.data.codes.length, batch: b.batch, missing: res.meta.missing }
+  } catch (e) { notify('Saving failed: ' + e.message) }
 }
-const printMade = () => popupBlocked(printCards(made.value.codes.map((code) => ({ code })), { title: made.value.batch }))
+
+// One printed card: print it again from its detail
+const printOne = (c) => popupBlocked(printCards([{ code: c.card_number, to: c.recipient?.name ?? '', from: c.from ?? '', value: c.status === 'in_stock' ? '' : c.type === 'service' ? c.service?.name : etb(c.initial_value) }], { title: `Gift card ${grouped(c.card_number)}` }))
 
 // ---- sell a printed card (scan → amount → payment)
 const physical = ref(null)
 const scanInput = ref(null)
 function openPhysical() {
-  physical.value = { code: '', card: null, checking: false, type: 'monetary', amount: 2500, service_id: services.value[0]?.id, method: 'cash',
-    purchaser: null, purchaserTerm: '', purchaser_name: '', recipient_name: '', recipient_phone: '', recipient_email: '', message: '', error: '' }
+  physical.value = { code: '', card: null, checking: false, type: 'monetary', amount: null, service_id: null, method: 'cash',
+    purchaser: null, purchaserTerm: '', purchaser_name: '', recipient_name: '', recipient_phone: '', recipient_email: '', message: '', reason: '', error: '' }
   setTimeout(() => scanInput.value?.focus(), 50)
 }
 async function checkPhysical() {
@@ -242,10 +266,22 @@ const physValue = computed(() => (physical.value?.type === 'service' ? services.
 async function sellPhysical() {
   const p = physical.value
   if (p.card?.status !== 'in_stock') return checkPhysical()
-  if (!(await ask({ title: `Activate card ${p.card.masked_code} for ${etb(physValue.value)}?`, body: `Payment: ${p.method.replace('_', ' ')} at the desk.${p.recipient_phone ? '\nThe recipient is told in the Lavish app if they have it.' : ''}`, ok: `Take ${etb(physValue.value)}` }))) return
+  p.error = ''
+  if (p.type === 'service' && !p.service_id) { p.error = 'Choose the treatment.'; return }
+  if (p.type !== 'service' && !(p.amount >= 100)) { p.error = 'Type the amount (ETB 100 or more).'; return }
+  if (!p.recipient_name.trim()) { p.error = 'Enter the recipient’s name.'; return }
+  if (p.type === 'promo' && !p.reason.trim()) { p.error = 'Write why this free card is given (audit log).'; return }
+  const promo = p.type === 'promo'
+  if (!(await ask({
+    title: `Activate card ${p.card.masked_code} — ${p.type === 'service' ? services.value.find((x) => x.id === p.service_id)?.name : etb(physValue.value)}?`,
+    body: [promo ? 'Free promotional card — no payment.' : `Payment: ${p.method.replace('_', ' ')} at the desk.`, `For ${p.recipient_name}${p.recipient_email ? ' · ' + p.recipient_email : ''}${p.recipient_phone ? ' · ' + p.recipient_phone : ''}`,
+      (p.recipient_email || p.recipient_phone) ? 'They get a message that the card is active, with the dates it can be used.' : ''].filter(Boolean).join('\n'),
+    ok: promo ? 'Activate free card' : `Take ${etb(physValue.value)}`,
+  }))) return
   try {
     const card = (await api.post('/staff/gift-cards/stock/sell', {
-      code: p.code, type: p.type, amount: p.type === 'monetary' ? p.amount : undefined, service_id: p.type === 'service' ? p.service_id : undefined, method: p.method,
+      code: p.code, type: p.type, amount: p.type !== 'service' ? p.amount : undefined, service_id: p.type === 'service' ? p.service_id : undefined,
+      method: promo ? undefined : p.method, reason: promo ? p.reason.trim() : undefined,
       purchaser_client_id: p.purchaser?.id, purchaser_name: p.purchaser ? undefined : p.purchaser_name || undefined,
       recipient_name: p.recipient_name || undefined, recipient_phone: p.recipient_phone || undefined, recipient_email: p.recipient_email || undefined, message: p.message || undefined,
     })).data
@@ -255,6 +291,20 @@ async function sellPhysical() {
     load()
   } catch (e) { p.error = e.message }
 }
+function sellFromDetail(c) {
+  detail.value = null
+  openPhysical()
+  physical.value.code = c.card_number ?? ''
+  if (physical.value.code) checkPhysical()
+}
+// Camera scanning (laptop webcam, tablet or phone) for the card number
+const camera = ref(null) // 'lookup' | 'sell'
+function scanned(text) {
+  const where = camera.value
+  camera.value = null
+  if (where === 'lookup' && looking.value) { looking.value.code = text; lookup() }
+  if (where === 'sell' && physical.value) { physical.value.code = text; checkPhysical() }
+}
 const page = ref(1)
 watch([status, q], () => (page.value = 1), { flush: 'sync' })
 </script>
@@ -263,13 +313,12 @@ watch([status, q], () => (page.value = 1), { flush: 'sync' })
   <div class="head">
     <div>
       <h1>Gift cards</h1>
-      <p>Activate e-gift cards bought in the app, sell printed cards, and scan a card at the visit to see everything about it and use it. A card can be spent over several visits until its balance runs out.</p>
+      <p>E-gift cards are bought by clients in the app — activate them here. Printed gift cards are sold at the desk. Scan a card at the visit to see everything about it and use it; it can be spent over several visits until its balance runs out.</p>
     </div>
     <div class="row" style="flex-wrap: nowrap; flex: none">
-      <button class="btn" @click="looking = { code: '', error: '' }">⌁ Scan a card</button>
-      <button v-if="auth.can('giftcards.stock')" class="btn ghost" @click="openStock">▤ Printed cards</button>
-      <button v-if="auth.can('giftcards.sell')" class="btn ghost" @click="openPhysical">Sell a printed card</button>
-      <button v-if="auth.can('giftcards.sell', 'giftcards.promo')" class="btn gold" @click="openSell">+ Sell a gift card</button>
+      <button class="btn" @click="looking = { code: '', error: '' }">⌁ Scan a gift card</button>
+      <button v-if="auth.can('giftcards.stock')" class="btn ghost" @click="openStock">▤ Printed Gift Cards</button>
+      <button v-if="auth.can('giftcards.sell')" class="btn gold" @click="openPhysical">Sell a Gift Card</button>
     </div>
   </div>
 
@@ -278,7 +327,7 @@ watch([status, q], () => (page.value = 1), { flush: 'sync' })
     <div v-if="auth.can('giftcards.activate')" class="card stat click" :class="{ warn: count('awaiting_activation') }" @click="status = 'awaiting_activation'; load()"><div class="n">{{ count('awaiting_activation') }}</div><div class="l">E-gift cards to activate</div></div>
     <div v-else class="card stat"><div class="n">{{ meta.total ?? rows.length }}</div><div class="l">{{ STATUS[status] ?? 'All' }} cards</div></div>
     <div class="card stat"><div class="n">{{ meta.in_stock ?? 0 }}</div><div class="l">Printed cards not sold yet</div></div>
-    <div class="card note gc-help">Codes are stored securely: only the last 4 characters are shown here. Scan a card’s barcode (or type its number) to look it up or sell it.</div>
+    <div class="card note gc-help">Scan a card’s barcode or QR code (or type its number) to look it up, sell it or use it.</div>
   </div>
 
   <div class="row" style="gap: 8px; margin-bottom: 12px">
@@ -288,9 +337,9 @@ watch([status, q], () => (page.value = 1), { flush: 'sync' })
     <input v-model="q" placeholder="Search name, phone or last 4 of the code" style="max-width: 300px; margin-left: auto" />
   </div>
   <p v-if="error" class="err">{{ error }}</p>
-  <p v-if="status === 'awaiting_activation'" class="note" style="margin: 0 0 10px">Paid e-gift cards bought in the app. Open one, check the buyer, recipient and amount, then activate it — the recipient is emailed / texted that it is active, with the dates it can be used.</p>
+  <p v-if="status === 'awaiting_activation'" class="note" style="margin: 0 0 10px">E-gift cards bought in the app. <b>Awaiting payment</b>: the client hasn’t paid yet (or their receipt is being checked) — you can record the payment and activate in one step. <b>To activate</b>: paid — check the buyer, recipient and amount, then activate; the recipient is emailed / texted that it is active, with the dates it can be used.</p>
 
-  <div v-if="status === 'in_stock' && meta.batches?.length" class="card" style="margin-bottom: 12px">
+  <div v-if="false" class="card" style="margin-bottom: 12px">
     <h3 style="margin-top: 0">Printed batches</h3>
     <table>
       <thead><tr><th>Batch</th><th>Cards</th><th>Not sold</th><th>Created</th></tr></thead>
@@ -303,7 +352,7 @@ watch([status, q], () => (page.value = 1), { flush: 'sync' })
       <thead><tr><th>Card</th><th>Balance</th><th>For</th><th>From</th><th>Status</th><th>Valid</th></tr></thead>
       <tbody>
         <tr v-for="c in rows" :key="c.id" class="click" @click="open(c.id)">
-          <td><span class="mini" :style="{ background: `linear-gradient(135deg, ${DESIGNS[c.design]?.[0]}, ${DESIGNS[c.design]?.[1]})` }"></span><b>{{ c.masked_code }}</b><small>{{ c.label }}</small></td>
+          <td><span v-if="c.card_number" class="mini-bc" v-html="barcodeSvg(c.card_number, { height: 22, width: 1 })"></span><span v-else class="mini" :style="{ background: `linear-gradient(135deg, ${DESIGNS[c.design]?.[0]}, ${DESIGNS[c.design]?.[1]})` }"></span><b>{{ c.card_number ? grouped(c.card_number) : c.masked_code }}</b><small>{{ c.status === 'in_stock' ? 'Printed card · not sold yet' + (c.batch ? ' · ' + c.batch : '') : c.label }}</small></td>
           <td v-if="c.status === 'in_stock'"><span class="note">Not sold yet</span></td><td v-else><b>{{ etb(c.balance) }}</b><small>of {{ etb(c.initial_value) }}</small><div v-if="c.status !== 'in_stock'" class="meter"><i :style="{ width: pct(c) + '%' }"></i></div></td>
           <td>{{ c.recipient.name ?? '—' }}<small>{{ c.recipient.phone }}</small></td>
           <td>{{ c.from ?? '—' }}<small>{{ SOURCE[c.source] }}{{ c.batch ? ' · ' + c.batch : '' }}</small></td>
@@ -324,6 +373,12 @@ watch([status, q], () => (page.value = 1), { flush: 'sync' })
         <img src="/img/logo-white.png" alt="" />
         <span class="v">{{ detail.type === 'service' ? detail.service?.name : etb(detail.balance) }}</span>
         <span class="c">{{ detail.masked_code }}</span>
+      </div>
+      <div v-if="detail.card_number" class="codes">
+        <div class="bc-big" v-html="barcodeSvg(detail.card_number, { height: 54, width: 1.6 })"></div>
+        <div class="qr-big" v-html="qrSvg(detail.card_number)"></div>
+        <div class="num">{{ grouped(detail.card_number) }}</div>
+        <button class="btn ghost sm" @click="printOne(detail)">🖨 Print this card</button>
       </div>
       <div class="kvs">
         <div><span>Status</span><b><span class="badge" :class="BADGE[detail.status]">{{ detail.status === 'in_stock' ? 'Printed card — not sold yet' : STATUS[detail.status] }}</span></b></div>
@@ -351,13 +406,23 @@ watch([status, q], () => (page.value = 1), { flush: 'sync' })
         </template>
         <button v-if="detail.status === 'active' && detail.balance > 0 && auth.can('giftcards.use')" class="btn gold" @click="openUse">Use for a treatment…</button>
       </div>
+      <template v-if="detail.status === 'active' || detail.messages?.length">
+        <h3>Message to the recipient</h3>
+        <p v-if="!detail.messages?.length" class="note">{{ detail.recipient.email || detail.recipient.phone ? 'Not sent yet.' : 'No recipient email or phone on this card.' }}</p>
+        <div v-for="(m, i) in detail.messages" :key="i" class="led">
+          <span class="grow"><b>{{ m.channel === 'email' ? '✉ Email' : '💬 SMS' }} to {{ m.to }}</b><small>{{ when(m.at) }}<template v-if="m.error"> · {{ m.error }}</template></small></span>
+          <span class="badge" :class="{ sent: 'paid', failed: 'declined', not_set_up: 'pending' }[m.status]">{{ { sent: 'Sent', failed: 'Failed', not_set_up: m.channel === 'email' ? 'Email not set up' : 'SMS not set up' }[m.status] }}</span>
+        </div>
+        <p v-if="detail.messages?.some((m) => m.status === 'not_set_up')" class="note">The server isn’t connected to {{ detail.messages.some((m) => m.status === 'not_set_up' && m.channel === 'email') ? 'email' : 'SMS' }} yet, so this message didn’t leave Lavish. Ask the developer to add the email (SMTP) / AfroMessage settings.</p>
+        <button v-if="detail.status === 'active' && (detail.recipient.email || detail.recipient.phone) && auth.can('giftcards.activate', 'giftcards.sell')" class="btn ghost sm" style="margin-top: 6px" @click="resend">↻ Send the message again</button>
+      </template>
       <h3>History</h3>
       <p v-if="!detail.ledger?.length" class="note">Nothing yet — the card’s value appears here when it is activated, then every use.</p>
       <div v-for="l in detail.ledger" :key="l.id" class="led">
         <span class="grow"><b>{{ LEDGER[l.type] ?? l.type }}</b><small>{{ when(l.created_at) }}<template v-if="l.reason"> · {{ l.reason }}</template><template v-if="l.by"> · {{ l.by }}</template></small></span>
         <span class="amt"><b :class="l.amount >= 0 ? 'pos' : 'neg'">{{ l.amount >= 0 ? '+' : '−' }}{{ etb(Math.abs(l.amount)) }}</b><small>{{ etb(l.balance_after) }} left</small></span>
       </div>
-      <button v-if="detail.status === 'in_stock' && auth.can('giftcards.sell')" class="btn gold" style="margin-top: 16px" @click="detail = null; openPhysical()">Sell this card (scan it)…</button>
+      <button v-if="detail.status === 'in_stock' && auth.can('giftcards.sell')" class="btn gold" style="margin-top: 16px" @click="sellFromDetail(detail)">Sell this card…</button>
       <button v-if="auth.can('giftcards.void') && ['active', 'redeemed', 'expired', 'in_stock'].includes(detail.status)" class="btn danger" style="margin-top: 16px" @click="voiding = { card: detail, reason: '', reissue: true, error: '' }">Void (lost / stolen card)…</button>
     </aside>
   </div>
@@ -443,6 +508,7 @@ watch([status, q], () => (page.value = 1), { flush: 'sync' })
       <h2>Scan a gift card</h2>
       <p class="note">Scan the barcode (on the printed card, or in the client’s app / email), or type the full code. You’ll see who it is for, who gave it, the amount, what is left, the dates it can be used and every use.</p>
       <input v-model="looking.code" class="codein" required autofocus placeholder="XXXX-XXXX-XXXX-XXXX" />
+      <button type="button" class="btn ghost" style="width: 100%; margin-top: 8px" @click="camera = 'lookup'">📷 Scan with camera</button>
       <p v-if="looking.error" class="err">{{ looking.error }}</p>
       <div class="row" style="justify-content: flex-end; margin-top: 14px"><button type="button" class="btn ghost" @click="looking = null">Cancel</button><button class="btn gold">Look up</button></div>
     </form>
@@ -451,15 +517,15 @@ watch([status, q], () => (page.value = 1), { flush: 'sync' })
   <!-- Printed cards: create a batch or import numbers (managers) -->
   <div v-if="stock" class="modal-bg" @click.self="stock = null">
     <form class="modal" style="width: min(600px, 95vw); max-height: 92vh; overflow: auto" @submit.prevent="saveStock">
-      <h2>Printed gift cards</h2>
-      <p class="note">Hard-copy cards with a barcode. They hold no value until reception sells one: scan it, enter the amount, take the money.</p>
+      <h2>Printed Gift Cards</h2>
+      <p class="note">Make hard-copy cards with a barcode and QR code. The cards are saved as a file on this computer (Downloads, or the folder you pick) — open it and print whenever you need. A card holds no value until it is sold at the desk.</p>
       <div class="seg">
-        <button type="button" :class="{ on: stock.mode === 'generate' }" @click="stock.mode = 'generate'">New numbers for the printer</button>
+        <button type="button" :class="{ on: stock.mode === 'generate' }" @click="stock.mode = 'generate'">New cards</button>
         <button type="button" :class="{ on: stock.mode === 'import' }" @click="stock.mode = 'import'">Cards already printed</button>
       </div>
       <template v-if="stock.mode === 'generate'">
         <label>How many cards</label><input v-model.number="stock.count" type="number" min="1" max="1000" required />
-        <p class="note">Lavish creates secure random numbers. You then download them as a CSV for the printing company, or print the cards here.</p>
+        <p class="note">Lavish creates secure random numbers. The print-ready cards (and a list of the numbers for a printing company) are saved as one file.</p>
       </template>
       <template v-else>
         <label>Card numbers <small class="note">— one per line, or a CSV from the printer</small></label>
@@ -468,71 +534,71 @@ watch([status, q], () => (page.value = 1), { flush: 'sync' })
         <p class="note">{{ importCodes(stock.text).length }} numbers found. Numbers must be at least 10 letters/digits — short, sequential numbers are easy to guess, so prefer “New numbers”.</p>
       </template>
       <label>Batch name</label><input v-model="stock.batch" maxlength="40" placeholder="e.g. Genna 2027 · Printer order 12" />
-      <label>Design</label>
-      <div class="designs"><button v-for="(c, k) in DESIGNS" :key="k" type="button" :class="{ on: stock.design === k }" :style="{ background: `linear-gradient(135deg, ${c[0]}, ${c[1]})` }" :title="k" @click="stock.design = k"></button></div>
       <p v-if="stock.error" class="err">{{ stock.error }}</p>
-      <div class="row" style="justify-content: flex-end; margin-top: 16px"><button type="button" class="btn ghost" @click="stock = null">Cancel</button><button class="btn gold">{{ stock.mode === 'generate' ? `Create ${stock.count || 0} cards` : 'Add cards' }}</button></div>
+      <div v-if="meta.batches?.length" style="margin-top: 14px">
+        <h3 style="margin: 0 0 6px">Batches</h3>
+        <table><thead><tr><th>Batch</th><th>Cards</th><th>Not sold</th><th>Made</th><th></th></tr></thead>
+          <tbody><tr v-for="b in meta.batches" :key="b.batch"><td><b>{{ b.batch }}</b></td><td>{{ b.total }}</td><td>{{ b.unsold }}</td><td>{{ day(b.created_at) }}</td>
+            <td><button type="button" class="btn ghost sm" @click="saveBatch(b)">⬇ Save cards</button></td></tr></tbody></table>
+      </div>
+      <div class="row" style="justify-content: flex-end; margin-top: 16px"><button type="button" class="btn ghost" @click="stock = null">Cancel</button><button class="btn gold" :disabled="stock.busy">{{ stock.mode === 'generate' ? `Print ${stock.count || 0} gift cards…` : 'Add cards' }}</button></div>
     </form>
   </div>
 
-  <!-- New batch: numbers shown once -->
-  <div v-if="made" class="modal-bg">
-    <div class="modal" style="width: min(560px, 95vw)">
-      <h2>{{ made.codes.length }} cards created · {{ made.batch }}</h2>
-      <p class="note">These numbers are shown only now. Download them for the printing company or print the cards here, then close.</p>
-      <div class="made-list"><code v-for="c in made.codes.slice(0, 8)" :key="c">{{ c }}</code><small v-if="made.codes.length > 8">… and {{ made.codes.length - 8 }} more</small></div>
-      <div class="row" style="justify-content: flex-end; gap: 8px; margin-top: 14px">
-        <button class="btn ghost" @click="cardsCsv(made.batch, made.codes)">⬇ CSV for the printer</button>
-        <button class="btn ghost" @click="printMade">🖨 Print cards here</button>
-        <button class="btn gold" @click="closeMade">Done</button>
-      </div>
+  <!-- Where the printed cards were saved -->
+  <div v-if="savedInfo" class="modal-bg" style="z-index: 46" @click.self="savedInfo = null">
+    <div class="modal" style="width: min(520px, 95vw)">
+      <h2>✓ {{ savedInfo.count }} gift cards saved</h2>
+      <p>Saved as <b>“{{ savedInfo.file }}”</b> — in your <b>Downloads</b> folder, or in the folder you picked if your browser asked.</p>
+      <ul class="files"><li>Open the file (double-click) and press <b>🖨 Print</b> — front and back of every card, with barcode and QR code.</li>
+        <li>The last page lists all the card numbers (for a printing company).</li></ul>
+      <p v-if="savedInfo.missing" class="note">{{ savedInfo.missing }} older card(s) in this batch were made before numbers were kept and are not in the file.</p>
+      <p class="note">You can save them again any time: Printed Gift Cards → “⬇ Save cards” next to the batch.<br />Want to choose the folder each time? In Chrome: ⋮ → Settings → Downloads → turn on “Ask where to save each file before downloading”.</p>
+      <div class="row" style="justify-content: flex-end; margin-top: 12px"><button class="btn gold" @click="savedInfo = null">OK</button></div>
     </div>
   </div>
+
+  <CameraScanner v-if="camera" title="Scan the gift card" @scanned="scanned" @close="camera = null" />
 
   <!-- Sell a printed card -->
   <div v-if="physical" class="modal-bg" @click.self="physical = null">
     <form class="modal" style="width: min(620px, 95vw); max-height: 92vh; overflow: auto" @submit.prevent="sellPhysical">
-      <h2>Sell a printed card</h2>
-      <p class="note">Scan the barcode on the back of the card (or type its number).</p>
+      <h2>Sell a Gift Card</h2>
+      <p class="note">Scan the barcode or QR code on the back of the printed card (or type its number).</p>
       <div class="row" style="gap: 8px; flex-wrap: nowrap">
         <input ref="scanInput" v-model="physical.code" class="codein" style="margin: 0" placeholder="Scan or type the card number" @keydown.enter.prevent="checkPhysical" @change="checkPhysical" />
         <button type="button" class="btn ghost" :disabled="physical.checking" @click="checkPhysical">Check</button>
+        <button type="button" class="btn ghost" title="Scan with the camera" @click="camera = 'sell'">📷 Camera</button>
       </div>
       <p v-if="physical.card?.status === 'in_stock'" class="ok">✓ Blank card {{ physical.card.masked_code }}{{ physical.card.batch ? ' · ' + physical.card.batch : '' }} — ready to sell</p>
       <template v-if="physical.card?.status === 'in_stock'">
         <div class="seg">
           <button type="button" :class="{ on: physical.type === 'monetary' }" @click="physical.type = 'monetary'">Amount</button>
           <button type="button" :class="{ on: physical.type === 'service' }" @click="physical.type = 'service'">A treatment</button>
+          <button v-if="auth.can('giftcards.promo')" type="button" :class="{ on: physical.type === 'promo' }" @click="physical.type = 'promo'">Promo (free)</button>
         </div>
-        <template v-if="physical.type === 'monetary'">
+        <template v-if="physical.type !== 'service'">
           <label>Amount (ETB)</label>
-          <div class="row" style="gap: 6px; flex-wrap: wrap">
-            <button v-for="a in [1000, 2500, 5000, 10000]" :key="a" type="button" class="btn sm" :class="physical.amount === a ? '' : 'ghost'" @click="physical.amount = a">{{ etb(a) }}</button>
-            <input v-model.number="physical.amount" type="number" min="100" step="50" required style="width: 140px" />
-          </div>
+          <input v-model.number="physical.amount" type="number" min="100" step="50" placeholder="Type the amount" style="width: 220px" />
         </template>
         <template v-else>
           <label>Treatment</label>
-          <select v-model="physical.service_id"><option v-for="s in services" :key="s.id" :value="s.id">{{ s.name }} — {{ etb(s.price) }}</option></select>
+          <select v-model="physical.service_id"><option :value="null" disabled>Choose a treatment…</option><option v-for="s in services" :key="s.id" :value="s.id">{{ s.name }} — {{ etb(s.price) }}</option></select>
         </template>
         <div class="grid g2">
-          <div>
-            <label>Buyer (client)</label>
-            <input v-model="physical.purchaserTerm" placeholder="Search by name or phone" @input="searchClients(physical.purchaserTerm); physical.purchaser = null" />
-            <div v-if="clients.length && !physical.purchaser" class="sugg-list"><button v-for="c in clients" :key="c.client.id" type="button" @click="physical.purchaser = c.client; physical.purchaserTerm = c.client.name; clients = []">{{ c.client.name }} <small>{{ c.client.phone }}</small></button></div>
-            <small class="note">{{ physical.purchaser ? 'Linked to ' + physical.purchaser.name : 'Optional — leave empty for a walk-in buyer' }}</small>
-          </div>
-          <div><label>Paid with</label>
+          <div v-if="physical.type !== 'promo'"><label>Paid with</label>
             <select v-model="physical.method"><option value="cash">Cash</option><option value="card">Card</option><option value="telebirr">Telebirr</option><option value="cbe_birr">CBE Birr</option><option value="bank_transfer">Bank transfer</option></select></div>
-          <div><label>Recipient name (optional)</label><input v-model="physical.recipient_name" /></div>
+          <div v-if="physical.type !== 'promo'"><label>Buyer name (optional)</label><input v-model="physical.purchaser_name" placeholder="Who is buying it" /></div>
+          <div><label>Recipient name</label><input v-model="physical.recipient_name" placeholder="Who the card is for" /></div>
           <div><label>Recipient phone (optional)</label><PhoneInput v-model="physical.recipient_phone" /></div>
           <div><label>Recipient email (optional)</label><input v-model="physical.recipient_email" type="email" /></div>
-          <div><label>Message (optional)</label><input v-model="physical.message" maxlength="300" /></div>
+          <div><label>Message (optional)</label><input v-model="physical.message" maxlength="300" placeholder="e.g. Happy birthday!" /></div>
+          <div v-if="physical.type === 'promo'"><label>Reason (audit log)</label><input v-model="physical.reason" maxlength="255" placeholder="e.g. Raffle winner" /></div>
         </div>
       </template>
       <p v-if="physical.card?.status === 'in_stock'" class="note">The card is active from today. If you enter the recipient’s phone or email, they get a message with the dates it can be used.</p>
       <p v-if="physical.error" class="err">{{ physical.error }}</p>
-      <div class="row" style="justify-content: flex-end; margin-top: 16px"><button type="button" class="btn ghost" @click="physical = null">Cancel</button><button class="btn gold" :disabled="physical.card?.status !== 'in_stock'">Activate · {{ etb(physValue) }}</button></div>
+      <div class="row" style="justify-content: flex-end; margin-top: 16px"><button type="button" class="btn ghost" @click="physical = null">Cancel</button><button class="btn gold" :disabled="physical.card?.status !== 'in_stock'">{{ physical.type === 'promo' ? 'Activate free card' : physValue ? `Activate · ${etb(physValue)}` : 'Activate' }}</button></div>
     </form>
   </div>
 
@@ -609,4 +675,13 @@ label { display: block; font-size: 13px; margin: 10px 0 4px; }
 .codein { width: 100%; margin-top: 10px; font: 600 18px ui-monospace, monospace; letter-spacing: 2px; text-transform: uppercase; text-align: center; }
 .err { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: #f8e7e5; color: var(--bad); font-size: 13px; }
 @media print { body * { visibility: hidden; } .print-card, .print-card * { visibility: visible; } .print-card { position: fixed; inset: 0; } .print-card .btn, .print-card .note { display: none; } }
+.mini-bc { display: inline-block; vertical-align: middle; margin-right: 8px; background: #fff; padding: 2px 3px; border-radius: 3px; border: 1px solid var(--line); }
+.mini-bc :deep(svg) { height: 18px; width: auto; max-width: 70px; display: block; }
+.codes { display: grid; justify-items: center; gap: 8px; margin: 6px 0 14px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.codes .bc-big :deep(svg) { max-width: 100%; height: 54px; display: block; }
+.codes .qr-big { width: 120px; height: 120px; }
+.codes .qr-big :deep(svg) { width: 100%; height: 100%; }
+.codes .num { font: 600 15px ui-monospace, monospace; letter-spacing: 1.5px; }
+.files { margin: 8px 0; padding-left: 18px; font-size: 13.5px; }
+.files li { margin: 4px 0; }
 </style>

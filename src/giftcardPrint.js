@@ -62,6 +62,7 @@ export function cardBackHtml(c) {
         <div class="line"><b>FROM</b><span>${esc(c.from ?? '')}</span></div>
         <div class="line"><b>GIFT OF</b><span>${esc(c.value ?? '')}</span></div>
         <p class="terms">${esc(CARD_INFO.terms)}</p>
+        <div class="bc">${barcodeSvg(c.code, { height: 30, width: 1.1 })}</div>
       </div>
       <div class="right">
         <div class="qr">${qrSvg(c.code)}</div>
@@ -95,6 +96,8 @@ export const CARD_CSS = `
   .lv-back .line b { width: 12mm; flex: none; font-size: 5pt; letter-spacing: .9px; color: #0b7177; font-weight: 700; }
   .lv-back .line span { flex: 1; border-bottom: .25mm solid #b9cfcf; font: italic 8pt 'EB Garamond', Georgia, serif; color: #2c3a3b; padding: 0 1mm .4mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .lv-back .terms { margin: 2.6mm 0 0; font-size: 4.4pt; line-height: 1.4; color: #6b7677; }
+  .lv-back .bc { margin-top: 1.6mm; height: 6.5mm; }
+  .lv-back .bc svg { height: 6.5mm; width: auto; max-width: 52mm; display: block; }
   .lv-back .right { width: 22mm; flex: none; display: flex; flex-direction: column; align-items: center; text-align: center; }
   .lv-back .qr { width: 19mm; height: 19mm; padding: 1mm; border: .25mm dashed #b88e7a; border-radius: .8mm; background: #fff; }
   .lv-back .qr svg { width: 100%; height: 100%; display: block; }
@@ -110,11 +113,11 @@ const FONTS = 'https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,
  * Opens a print window. cards: [{ code, value?, to?, from? }]
  * Each card prints its front and back side by side, credit-card size, with cut lines.
  */
-export function printCards(cards, { title = 'Lavish gift cards' } = {}) {
-  const w = window.open('', '_blank')
-  if (!w) return false
-  const body = cards.map((c) => `<div class="pair">${cardFrontHtml()}${cardBackHtml(c)}</div>`).join('')
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
+export function cardsDocument(cards, { title = 'Lavish gift cards', numbers = null } = {}) {
+  const list = numbers?.length
+    ? `<div class="numbers"><h2>Card numbers · ${esc(title)}</h2><ol>${numbers.map((n) => `<li>${esc(grouped(n))}</li>`).join('')}</ol></div>` : ''
+  const body = cards.map((c) => `<div class="pair">${cardFrontHtml()}${cardBackHtml(c)}</div>`).join('') + list
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
   <link rel="stylesheet" href="${FONTS}">
   <style>
     @page { size: A4; margin: 10mm; }
@@ -124,13 +127,74 @@ export function printCards(cards, { title = 'Lavish gift cards' } = {}) {
     .pair { display: flex; gap: 6mm; margin-bottom: 6mm; break-inside: avoid; }
     .pair .lv-card { outline: .2mm dashed #bbb; outline-offset: .8mm; }
     ${CARD_CSS}
+    .numbers { break-before: page; font-size: 11pt; }
+    .numbers h2 { font: 500 16pt Georgia, serif; }
+    .numbers ol { columns: 3; font-family: ui-monospace, Consolas, monospace; }
     @media print { .bar { display: none; } }
   </style></head><body>
-    <div class="bar"><button onclick="print()">🖨 Print</button><span>${cards.length} card${cards.length === 1 ? '' : 's'} · front and back · cut along the dashed line</span></div>
+    <div class="bar"><button onclick="print()">🖨 Print</button><span>${esc(title)} · ${cards.length} card${cards.length === 1 ? '' : 's'} · front and back · cut along the dashed line</span></div>
     ${body}
-  </body></html>`)
+  </body></html>`
+}
+
+export function printCards(cards, opts = {}) {
+  const w = window.open('', '_blank')
+  if (!w) return false
+  w.document.write(cardsDocument(cards, opts))
   w.document.close()
   return true
+}
+
+const safeName = (s) => String(s).replace(/[\\/:*?"<>|]+/g, '-').trim() || 'Lavish gift cards'
+
+export const printFileName = (batch) => `${safeName(`Lavish gift cards – ${batch}`)}.html`
+
+/**
+ * Step 1 — call straight from the button click (browsers only open the "Save as" window right after a click):
+ * the user picks the folder and file name for the print file. Returns a file handle, null when the browser
+ * has no "Save as" window (the file is downloaded instead), or 'cancel' if the user closed it.
+ */
+export async function pickSaveFile(batch) {
+  if (!window.showSaveFilePicker) return null
+  try {
+    return await window.showSaveFilePicker({
+      id: 'lavish-gift-cards', startIn: 'documents', suggestedName: printFileName(batch),
+      types: [{ description: 'Lavish gift cards (open and print)', accept: { 'text/html': ['.html'] } }],
+    })
+  } catch (e) {
+    if (e?.name === 'AbortError') return 'cancel'
+    return null // anything else: fall back to a normal download
+  }
+}
+
+/**
+ * Step 2 — writes the print-ready file (front and back of every card, then a page listing the card numbers) to the
+ * chosen file, or downloads it. Returns { file, path? , downloaded? }.
+ */
+export async function saveCards(codes, batch, handle = null) {
+  const html = cardsDocument(codes.map((code) => ({ code })), { title: `Lavish gift cards – ${batch}`, numbers: codes })
+  if (handle && handle !== 'cancel') {
+    try {
+      const w = await handle.createWritable()
+      await w.write(new Blob([html], { type: 'text/html' }))
+      await w.close()
+      const check = await handle.getFile()
+      if (check.size > 0) return { file: handle.name }
+    } catch { /* fall back to a download below */ }
+  }
+  download(printFileName(batch), html, 'text/html')
+  return { file: printFileName(batch), downloaded: true }
+}
+
+function download(file, text, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }))
+  Object.assign(document.createElement('a'), { href: url, download: file }).click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+function csvText(batch, codes) {
+  const rows = [['batch', 'card_number', 'qr_and_barcode_value'], ...codes.map((c) => [batch, grouped(c), plain(c)])]
+  return rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
 }
 
 /** CSV for the printing company: one row per card — the printed number and the value to put in the QR code. */

@@ -11,6 +11,8 @@ import { etb, pts, day, when, TIER_COLORS } from '../../fmt'
 import CheckoutDialog from '../CheckoutDialog.vue'
 import Pager from '../Pager.vue'
 import PhoneInput from '../PhoneInput.vue'
+import { barcodeSvg } from '../../giftcardPrint'
+import CameraScanner from '../CameraScanner.vue'
 
 const auth = useAuth()
 const q = ref('')
@@ -58,6 +60,7 @@ const r = computed(() => profile.value?.rewards)
 
 // Clients who asked to join from the app: enrol them or decline with a reason they see.
 const showRequests = ref(false)
+const scanning = ref(false)
 function toggleRequests() { showRequests.value = !showRequests.value; q.value = ''; listPage.value = 1; search() }
 const declining = ref(null)
 async function declineRequest() {
@@ -147,11 +150,15 @@ const listMeta = ref({})
       <button v-if="auth.can('rewards.enroll') && (listMeta.join_requests || showRequests)" class="req-toggle" :class="{ on: showRequests }" @click="toggleRequests">
         {{ showRequests ? '← Back to members' : `✋ ${listMeta.join_requests} asked to join in the app` }}
       </button>
-      <input v-model="q" class="search-in" placeholder="Search any client by name or phone…" />
+      <div class="row" style="gap: 6px; flex-wrap: nowrap">
+        <input v-model="q" class="search-in" placeholder="Name, phone — or scan the member card" />
+        <button type="button" class="btn ghost sm" title="Scan a member card with the camera" @click="scanning = true">📷</button>
+      </div>
+      <CameraScanner v-if="scanning" title="Scan the member card" @scanned="(t) => { scanning = false; q = t }" @close="scanning = false" />
       <p class="note" style="margin: 8px 2px">{{ showRequests ? 'Asked to join from the app — open one to enrol or decline' : q ? 'All clients (members and not)' : 'Members by points (last 12 months)' }}</p>
       <button v-for="m in list" :key="m.client.id" class="rc-row" :class="{ on: selected === m.client.id }" @click="open(m.client.id)">
         <span class="dot" :style="{ background: TIER_COLORS[m.tier?.key] ?? '#d9d6d2' }"></span>
-        <span class="grow"><b>{{ m.client.name }}</b><small>{{ m.member ? m.tier?.name : m.requested_at ? 'Asked to join' : 'Not a member' }} · {{ m.client.phone }}</small><small v-if="m.request_note" class="rq">“{{ m.request_note }}”</small></span>
+        <span class="grow"><b>{{ m.client.name }}</b><small>{{ m.member ? m.tier?.name : m.requested_at ? 'Asked to join' : 'Not a member' }} · {{ m.client.phone }}</small><small v-if="m.joined_in_app" class="rq">Joined in the app</small><small v-if="m.request_note" class="rq">“{{ m.request_note }}”</small></span>
         <span class="p">{{ m.member ? m.points_balance.toLocaleString() : '—' }}</span>
       </button>
       <p v-if="!loadingList && !list.length" class="empty">{{ q ? 'No clients found' : 'No members yet — enrol clients who ask to join' }}</p>
@@ -174,6 +181,7 @@ const listMeta = ref({})
           <div class="who">
             <span class="eyebrow">{{ r.member ? (r.tier?.name ?? '').toUpperCase() + ' MEMBER' : 'NOT A MEMBER YET' }}</span>
             <h2>{{ profile.client.name }}</h2>
+            <div v-if="r.member_number" class="mcard"><span v-html="barcodeSvg(r.member_number, { height: 30, width: 1.2 })"></span><small>{{ r.member_number }}</small></div>
             <p class="note">{{ profile.client.phone }}<template v-if="r.member"> · Member since {{ day(r.joined_at) }}<template v-if="profile.enrolled_by"> · enrolled by {{ profile.enrolled_by }}</template> · Referral code <b>{{ r.referral_code }}</b></template></p>
           </div>
           <div class="bal">
@@ -324,6 +332,9 @@ const listMeta = ref({})
 .rc-hero .bal span { font-size: 12.5px; opacity: .85; }
 .rc-hero .bal .held { display: block; margin-top: 4px; font-size: 11.5px; }
 .amt { text-align: right; }
+.mcard { display: inline-flex; flex-direction: column; align-items: center; margin: 6px 0; padding: 6px 10px 4px; border-radius: 8px; background: #fff; }
+.mcard :deep(svg) { height: 30px; width: auto; display: block; }
+.mcard small { color: #333; font: 600 11px ui-monospace, monospace; letter-spacing: 1px; }
 .req-toggle { width: 100%; margin-bottom: 10px; padding: 9px 12px; border-radius: 10px; border: 1px solid #f0dcb5; background: #fdf3e2; color: #8a5a12; font-weight: 500; cursor: pointer; text-align: left; }
 .req-toggle.on { background: #fff; border-color: var(--line); color: var(--ink); }
 .rc-row .rq { color: #8a5a12; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
